@@ -1,5 +1,14 @@
 <!doctype html>
 <html>
+<head>
+  <meta charset="utf-8">
+  <title>Latency Location POC - Coordinate Guided</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 24px; }
+    button { font-size: 16px; padding: 8px 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #f6f6f6; padding: 16px; border-radius: 8px; }
+  </style>
+</head>
 <body>
   <button id="run">Run latency location POC</button>
   <pre id="out"></pre>
@@ -921,373 +930,350 @@
     const out = document.getElementById("out");
     const runButton = document.getElementById("run");
 
-    // Hierarchical bounded-probe strategy.
-    // Goal: avoid measuring hundreds of probes in one browser burst, while still
-    // keeping enough coverage to avoid picking the wrong country from one lucky probe.
-    const SAMPLE_COUNT = 5;
-    const TIMEOUT_MS = 5000;
-    const CLOSEST_PROBES_TO_USE = 5;
+    const CONFIG = {
+      sampleCount: 3,
+      requestTimeoutMs: 5200,
+      sampleDelayMs: 40,
 
-    const GLOBAL_LANDMARKS_PER_CONTINENT = 3;
-    const COUNTRY_SAMPLE_PROBES_PER_COUNTRY = 3;
-    const TOP_COUNTRIES_TO_EXPAND = 3;
-    const TOP_CITIES_TO_REFINE = 2;
+      globalConcurrency: 5,
+      searchConcurrency: 4,
+      detailConcurrency: 3,
+      retestConcurrency: 1,
 
-    // Good default for browsers: bounded parallelism across different probe hosts.
-    // Samples inside one probe are always sequential.
-    const PROBE_CONCURRENCY = 8;
-    const REFINEMENT_CONCURRENCY = 3;
-    const RETEST_CONCURRENCY = 1;
+      globalLandmarksPerContinent: 2,
+      globalSeedCount: 3,
 
-    const SAMPLE_GAP_MS = 150;
-    const PROBE_GAP_MS = 25;
-    const WARMUP_GAP_MS = 150;
-    const MAX_SUSPICIOUS_RETESTS_PER_STAGE = 30;
+      searchBatchSize: 10,
+      beamSize: 3,
+      nearestNeighborsPerBeam: 10,
+      sectorNeighborsPerBeam: 8,
+      maxSearchWaves: 8,
+      maxCityNodesMeasured: 45,
+      minSearchNodesBeforeStop: 18,
+      stopAfterNoImprovementWaves: 3,
+      excellentScoreMs: 18,
 
-    const GLOBAL_LANDMARK_PROBE_IDS = {
-      "North America": [
-        "na-us-east-linode",
-        "na-us-west-vultr",
-        "global-north-america-chicago",
-        "global-north-america-toronto",
-        "global-north-america-mexico-city"
-      ],
-      "South America": [
-        "sa-sao-paulo-vultr",
-        "global-south-america-rio-de-janeiro",
-        "sa-sao-paulo-vultr",
-        "global-south-america-buenos-aires",
-        "global-south-america-santiago",
-        "global-south-america-lima"
-      ],
-      Europe: [
-        "eu-london-linode",
-        "eu-frankfurt-linode",
-        "eu-rome-fastweb",
-        "eu-oslo-telenor",
-        "istanbul-turknet"
-      ],
-      Asia: [
-        "asia-singapore-linode",
-        "asia-tokyo-linode",
-        "global-asia-seoul",
-        "global-asia-mumbai",
-        "global-asia-dubai"
-      ],
-      Oceania: [
-        "oceania-sydney-linode",
-        "global-oceania-melbourne",
-        "global-oceania-auckland",
-        "global-oceania-perth",
-        "global-oceania-brisbane"
-      ],
-      Africa: [
-        "af-johannesburg-vultr",
-        "global-africa-cairo",
-        "global-africa-lagos",
-        "global-africa-nairobi",
-        "global-africa-cape-town"
-      ]
+      detailTopCountries: 2,
+      detailTopRegionsPerCountry: 3,
+      maxFullCountryProbes: 30,
+      maxDetailProbesTotal: 60,
+
+      suspiciousRetestMax: 10,
+      spatialDiversityKm: 150
     };
 
     function sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    function appendCacheBust(url) {
-      const separator = url.includes("?") ? "&" : "?";
-      const nonce = typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
-      return `${url}${separator}cacheBust=${Date.now()}-${nonce}`;
+    function round(value, decimals = 4) {
+      const factor = Math.pow(10, decimals);
+      return Math.round(value * factor) / factor;
     }
 
-    async function timeRequest(url, timeoutMs = TIMEOUT_MS) {
+    function continentMatches(value, continent) {
+      return String(value || "").split("/").map(v => v.trim()).includes(continent);
+    }
+
+    function withCacheBuster(url) {
+      const separator = url.includes("?") ? "&" : "?";
+      const unique = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      return `${url}${separator}cb=${encodeURIComponent(unique)}`;
+    }
+
+    function haversineKm(aLat, aLon, bLat, bLon) {
+      const toRad = deg => deg * Math.PI / 180;
+      const R = 6371;
+      const dLat = toRad(bLat - aLat);
+      const dLon = toRad(bLon - aLon);
+      const lat1 = toRad(aLat);
+      const lat2 = toRad(bLat);
+      const h =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    function bearingDeg(aLat, aLon, bLat, bLon) {
+      const toRad = deg => deg * Math.PI / 180;
+      const toDeg = rad => rad * 180 / Math.PI;
+      const lat1 = toRad(aLat);
+      const lat2 = toRad(bLat);
+      const dLon = toRad(bLon - aLon);
+      const y = Math.sin(dLon) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) -
+        Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    function groupBy(items, keyFn) {
+      const map = new Map();
+      for (const item of items) {
+        const key = keyFn(item);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
+      }
+      return map;
+    }
+
+    function uniqueById(items) {
+      const seen = new Set();
+      const result = [];
+      for (const item of items) {
+        if (!item || !item.id || seen.has(item.id)) continue;
+        seen.add(item.id);
+        result.push(item);
+      }
+      return result;
+    }
+
+    function mapWithConcurrency(items, concurrency, mapper, onProgress) {
+      const results = new Array(items.length);
+      let index = 0;
+      let completed = 0;
+
+      async function worker() {
+        while (index < items.length) {
+          const current = index++;
+          try {
+            results[current] = await mapper(items[current], current);
+          } catch (err) {
+            results[current] = {
+              ok: false,
+              error: err.message || String(err),
+              item: items[current]
+            };
+          }
+          completed += 1;
+          if (onProgress) onProgress(completed, items.length, items[current], results[current]);
+        }
+      }
+
+      return Promise.all(
+        Array.from({ length: Math.min(concurrency, items.length) }, worker)
+      ).then(() => results);
+    }
+
+    function makeProbeIndex() {
+      return new Map(probes.map(probe => [probe.id, probe]));
+    }
+
+    async function timeRequest(url) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      const start = performance.now();
+      const timeout = setTimeout(() => controller.abort(), CONFIG.requestTimeoutMs);
+      const started = performance.now();
 
       try {
-        await fetch(appendCacheBust(url), {
+        await fetch(withCacheBuster(url), {
           method: "GET",
           mode: "no-cors",
           cache: "no-store",
           credentials: "omit",
           signal: controller.signal
         });
-
-        return {
-          ok: true,
-          ms: performance.now() - start
-        };
+        return { ok: true, ms: Math.round(performance.now() - started) };
       } catch (err) {
         return {
           ok: false,
-          ms: null,
-          error: err.name || String(err)
+          ms: Math.round(performance.now() - started),
+          error: err.name || err.message || String(err)
         };
       } finally {
-        clearTimeout(timer);
+        clearTimeout(timeout);
       }
     }
 
-    async function measureProbe(probe, samples = SAMPLE_COUNT) {
-      const errors = [];
-      const values = [];
+    function classifyTiming(samplesMs, failedSamples) {
+      if (!samplesMs.length) return { suspiciousTiming: true, timingQuality: "failed" };
 
-      // Warm-up absorbs DNS/TCP/TLS setup noise. It is not included in samples.
-      await timeRequest(probe.url);
-      await sleep(WARMUP_GAP_MS);
+      const sorted = [...samplesMs].sort((a, b) => a - b);
+      const minMs = sorted[0];
+      const maxMs = sorted[sorted.length - 1];
+      const medianMs = sorted[Math.floor(sorted.length / 2)];
+      const rawJitterMs = maxMs - minMs;
 
-      // Samples for the same probe stay sequential. Parallelism is only across probes.
-      for (let i = 0; i < samples; i++) {
-        const result = await timeRequest(probe.url);
+      const timeoutLikeOutlier = maxMs >= CONFIG.requestTimeoutMs - 800 && medianMs < 500;
+      const veryHighStable = minMs > 1000 && medianMs > 1000 && rawJitterMs < 250;
+      const mostlyFailed = failedSamples >= Math.ceil(CONFIG.sampleCount / 2);
 
-        if (result.ok && Number.isFinite(result.ms)) {
-          values.push(result.ms);
-        } else {
-          errors.push(result.error || "failed");
-        }
-
-        if (i < samples - 1) {
-          await sleep(SAMPLE_GAP_MS);
-        }
+      if (mostlyFailed || veryHighStable) {
+        return { suspiciousTiming: true, timingQuality: "suspicious" };
       }
 
-      values.sort((a, b) => a - b);
+      if (timeoutLikeOutlier || rawJitterMs > 1000) {
+        return { suspiciousTiming: false, timingQuality: "noisy" };
+      }
 
-      const minMs = values.length ? values[0] : null;
-      const maxMs = values.length ? values[values.length - 1] : null;
-      const medianMs = values.length ? values[Math.floor(values.length / 2)] : null;
-      const jitterMs = minMs === null || maxMs === null ? null : maxMs - minMs;
-      const scoreMs = minMs === null || jitterMs === null ? null : minMs + jitterMs * 0.03;
+      return { suspiciousTiming: false, timingQuality: "normal" };
+    }
 
-      const result = {
-        ...probe,
-        ok: values.length > 0,
-        minMs: minMs === null ? null : Math.round(minMs),
-        maxMs: maxMs === null ? null : Math.round(maxMs),
-        medianMs: medianMs === null ? null : Math.round(medianMs),
-        jitterMs: jitterMs === null ? null : Math.round(jitterMs),
-        scoreMs: scoreMs === null ? null : Math.round(scoreMs),
-        samplesMs: values.map(v => Math.round(v)),
-        failedSamples: samples - values.length,
-        errors
+    function summarizeSamples(samplesMs, failedSamples) {
+      const sorted = [...samplesMs].sort((a, b) => a - b);
+      if (!sorted.length) {
+        return {
+          ok: false,
+          minMs: null,
+          maxMs: null,
+          medianMs: null,
+          jitterMs: null,
+          rawJitterMs: null,
+          scoreMs: null,
+          samplesMs: [],
+          failedSamples
+        };
+      }
+
+      const minMs = sorted[0];
+      const maxMs = sorted[sorted.length - 1];
+      const medianMs = sorted[Math.floor(sorted.length / 2)];
+
+      // Robust score: ignores the single worst sample for 5-sample runs.
+      // This avoids one browser/HTTP timeout turning a good 10 ms endpoint into a 150 ms score.
+      const trimmedIndex = Math.max(0, Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.8) - 1));
+      const trimmedHighMs = sorted[trimmedIndex];
+      const jitterMs = trimmedHighMs - minMs;
+      const rawJitterMs = maxMs - minMs;
+      const scoreMs = Math.round(minMs + jitterMs * 0.05 + failedSamples * 25);
+
+      return {
+        ok: true,
+        minMs,
+        maxMs,
+        medianMs,
+        jitterMs,
+        rawJitterMs,
+        scoreMs,
+        samplesMs: sorted,
+        failedSamples
       };
-
-      result.suspiciousTiming = isSuspiciousTiming(result);
-      result.timingQuality = getTimingQuality(result);
-      return result;
     }
 
-    async function mapWithConcurrency(items, concurrency, mapper, onProgress) {
-      const results = new Array(items.length);
-      let nextIndex = 0;
-      let completed = 0;
+    async function measureProbe(probe, stage, sampleCount = CONFIG.sampleCount) {
+      const samplesMs = [];
+      const errors = [];
 
-      async function worker() {
-        while (true) {
-          const currentIndex = nextIndex++;
-          if (currentIndex >= items.length) {
-            return;
-          }
-
-          results[currentIndex] = await mapper(items[currentIndex], currentIndex);
-          completed += 1;
-
-          if (typeof onProgress === "function") {
-            onProgress({ completed, total: items.length, item: items[currentIndex], result: results[currentIndex] });
-          }
-
-          if (PROBE_GAP_MS > 0) {
-            await sleep(PROBE_GAP_MS);
-          }
+      for (let i = 0; i < sampleCount; i++) {
+        const result = await timeRequest(probe.url);
+        if (result.ok) {
+          samplesMs.push(result.ms);
+        } else {
+          errors.push(result.error);
         }
+        if (i < sampleCount - 1) await sleep(CONFIG.sampleDelayMs);
       }
 
-      const workerCount = Math.max(1, Math.min(concurrency, items.length));
-      await Promise.all(Array.from({ length: workerCount }, worker));
-      return results;
+      const summary = summarizeSamples(samplesMs, sampleCount - samplesMs.length);
+      const timing = classifyTiming(summary.samplesMs, summary.failedSamples);
+
+      return {
+        ...probe,
+        ...summary,
+        ...timing,
+        errors,
+        stages: [stage]
+      };
     }
 
     async function measureProbeSet(probesToMeasure, stage, concurrency, onProgress) {
       const unique = uniqueById(probesToMeasure);
-
       return mapWithConcurrency(
         unique,
         concurrency,
-        async probe => ({
-          ...(await measureProbe(probe, SAMPLE_COUNT)),
-          stages: [stage]
-        }),
+        probe => measureProbe(probe, stage),
         onProgress
       );
     }
 
-    async function retestSuspiciousResults(results, stage, onProgress) {
-      const probeById = buildProbeIndex();
-      const suspicious = results
-        .filter(result => result.ok && result.suspiciousTiming)
-        .sort((a, b) => a.scoreMs - b.scoreMs)
-        .slice(0, MAX_SUSPICIOUS_RETESTS_PER_STAGE)
-        .map(result => probeById.get(result.id))
-        .filter(Boolean);
+    function makeCityKey(probe) {
+      return [
+        probe.country || "",
+        probe.region || "",
+        round(Number(probe.lat), 3),
+        round(Number(probe.lon), 3)
+      ].join("|");
+    }
 
-      if (!suspicious.length) {
-        return { results, retested: [] };
-      }
-
-      const retested = await measureProbeSet(
-        suspicious,
-        stage,
-        RETEST_CONCURRENCY,
-        onProgress
+    function makeCityNodes(probesToUse) {
+      const byCity = groupBy(
+        probesToUse.filter(p =>
+          p &&
+          Number.isFinite(Number(p.lat)) &&
+          Number.isFinite(Number(p.lon)) &&
+          p.country &&
+          p.region
+        ),
+        makeCityKey
       );
 
-      return {
-        results: replaceResultsById(results, retested),
-        retested
-      };
-    }
+      const nodes = [];
+      for (const [key, cityProbes] of byCity.entries()) {
+        const sorted = [...cityProbes].sort((a, b) => {
+          // Prefer shorter ids / generic city landmarks as representatives, but keep deterministic.
+          return a.id.length - b.id.length || a.id.localeCompare(b.id);
+        });
+        const representative = sorted[0];
 
-    function sortByScore(results, options = {}) {
-      const preferClean = options.preferClean !== false;
-
-      return [...results].sort((a, b) => {
-        const aa = rankingScore(a, preferClean);
-        const bb = rankingScore(b, preferClean);
-        return aa - bb;
-      });
-    }
-
-    function rankingScore(result, preferClean = true) {
-      if (!result || !result.ok || !Number.isFinite(result.scoreMs)) {
-        return Infinity;
-      }
-
-      // Keep suspicious timings visible, but make clean timings win when close.
-      // This avoids a queued/throttled 1700ms stable result looking authoritative.
-      return result.scoreMs + (preferClean && result.suspiciousTiming ? 10000 : 0);
-    }
-
-    function uniqueById(items) {
-      return [...new Map(items.filter(Boolean).map(item => [item.id, item])).values()];
-    }
-
-    function replaceResultsById(originalResults, replacementResults) {
-      const byId = new Map(originalResults.map(result => [result.id, result]));
-
-      for (const result of replacementResults) {
-        const previous = byId.get(result.id);
-        byId.set(result.id, {
-          ...result,
-          previousMeasurement: previous ? pickSummaryProbe(previous) : null
+        nodes.push({
+          key,
+          country: representative.country,
+          region: representative.region,
+          continent: representative.continent,
+          lat: Number(representative.lat),
+          lon: Number(representative.lon),
+          representative,
+          probes: sorted,
+          probeCount: sorted.length
         });
       }
 
-      return [...byId.values()];
+      return nodes;
     }
 
-    function continentMatches(probeContinent, selectedContinent) {
-      return String(probeContinent)
-        .split("/")
-        .map(part => part.trim())
-        .includes(selectedContinent);
+    function centroid(nodes) {
+      const valid = nodes.filter(n => Number.isFinite(n.lat) && Number.isFinite(n.lon));
+      if (!valid.length) return null;
+      return {
+        lat: valid.reduce((sum, n) => sum + n.lat, 0) / valid.length,
+        lon: valid.reduce((sum, n) => sum + n.lon, 0) / valid.length
+      };
     }
 
-    function countryMatches(probeCountry, selectedCountry) {
-      return String(probeCountry).trim() === String(selectedCountry).trim();
-    }
+    function pickSpreadNodes(nodes, limit) {
+      const unique = [...nodes];
+      if (unique.length <= limit) return unique;
 
-    function buildProbeIndex() {
-      return new Map(probes.map(probe => [probe.id, probe]));
-    }
-
-    function getGlobalLandmarkProbes() {
-      const probeById = buildProbeIndex();
+      const c = centroid(unique);
       const selected = [];
 
-      for (const ids of Object.values(GLOBAL_LANDMARK_PROBE_IDS)) {
-        for (const id of ids.slice(0, GLOBAL_LANDMARKS_PER_CONTINENT)) {
-          if (probeById.has(id)) {
-            selected.push(probeById.get(id));
+      if (c) {
+        let nearestToCenter = unique[0];
+        let bestCenterDistance = Infinity;
+        for (const node of unique) {
+          const d = haversineKm(c.lat, c.lon, node.lat, node.lon);
+          if (d < bestCenterDistance) {
+            bestCenterDistance = d;
+            nearestToCenter = node;
           }
         }
+        selected.push(nearestToCenter);
+      } else {
+        selected.push(unique[0]);
       }
 
-      return uniqueById(selected);
-    }
-
-    function getContinentProbes(continent) {
-      return probes.filter(probe => continentMatches(probe.continent, continent));
-    }
-
-    function getCountryProbes(country) {
-      return probes.filter(probe => countryMatches(probe.country, country));
-    }
-
-    function groupBy(items, getKey) {
-      const groups = new Map();
-
-      for (const item of items) {
-        const key = getKey(item);
-        if (!groups.has(key)) {
-          groups.set(key, []);
-        }
-        groups.get(key).push(item);
-      }
-
-      return groups;
-    }
-
-    function sampleSpreadByCountry(continentProbes, maxPerCountry) {
-      const selected = [];
-      const byCountry = groupBy(continentProbes.filter(p => p.country), p => p.country);
-
-      for (const countryProbes of byCountry.values()) {
-        selected.push(...pickSpreadProbes(countryProbes, maxPerCountry));
-      }
-
-      return uniqueById(selected);
-    }
-
-    function pickSpreadProbes(candidateProbes, limit) {
-      const unique = uniqueById(candidateProbes)
-        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-
-      if (unique.length <= limit) {
-        return unique;
-      }
-
-      // First prefer a large/popular city if present. This keeps Vilnius in Lithuania,
-      // London in the UK, Warsaw in Poland, etc., when such a probe exists.
-      const byRegion = groupBy(unique, p => normalizeRegion(p.region));
-      const largestRegionGroup = [...byRegion.values()]
-        .sort((a, b) => b.length - a.length)[0];
-
-      const selected = [largestRegionGroup[0]];
-
-      // Then choose the farthest probes from already selected probes to cover area.
       while (selected.length < limit) {
         let best = null;
         let bestDistance = -1;
 
-        for (const probe of unique) {
-          if (selected.some(item => item.id === probe.id)) {
-            continue;
-          }
+        for (const node of unique) {
+          if (selected.some(s => s.key === node.key)) continue;
 
           const nearestSelectedDistance = Math.min(
-            ...selected.map(s => haversineKm(probe.lat, probe.lon, s.lat, s.lon))
+            ...selected.map(s => haversineKm(node.lat, node.lon, s.lat, s.lon))
           );
 
-          // Prefer a new city when distance ties are close.
-          const newRegionBonus = selected.some(s => normalizeRegion(s.region) === normalizeRegion(probe.region)) ? 0 : 0.001;
-          const score = nearestSelectedDistance + newRegionBonus;
-
-          if (score > bestDistance) {
-            bestDistance = score;
-            best = probe;
+          if (nearestSelectedDistance > bestDistance) {
+            bestDistance = nearestSelectedDistance;
+            best = node;
           }
         }
 
@@ -1298,334 +1284,77 @@
       return selected;
     }
 
-    function normalizeRegion(region) {
-      return String(region || "").trim().toLowerCase();
-    }
+    function buildGlobalLandmarks() {
+      const active = probes.filter(p => p && p.id && p.url && p.continent);
+      const byContinent = new Map();
 
-    function haversineKm(lat1, lon1, lat2, lon2) {
-      const radiusKm = 6371;
-      const toRad = degrees => degrees * Math.PI / 180;
-      const dLat = toRad(lat2 - lat1);
-      const dLon = toRad(lon2 - lon1);
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) ** 2;
-      return 2 * radiusKm * Math.asin(Math.sqrt(a));
-    }
-
-    function rankContinents(results) {
-      const groups = new Map();
-
-      for (const result of results) {
-        for (const continent of String(result.continent).split("/").map(part => part.trim())) {
-          if (!groups.has(continent)) {
-            groups.set(continent, []);
-          }
-          groups.get(continent).push(result);
+      for (const probe of active) {
+        for (const continent of String(probe.continent).split("/").map(v => v.trim()).filter(Boolean)) {
+          if (!byContinent.has(continent)) byContinent.set(continent, []);
+          byContinent.get(continent).push(probe);
         }
       }
 
-      return [...groups.entries()]
-        .map(([continent, continentResults]) => buildRankingEntry("continent", continent, continentResults))
-        .sort(compareRankingEntries);
-    }
-
-    function rankCountries(results) {
-      const groups = new Map();
-
-      for (const result of results) {
-        if (!result.country) {
-          continue;
+      const landmarks = [];
+      for (const [continent, continentProbes] of byContinent.entries()) {
+        const nodes = makeCityNodes(continentProbes);
+        const spread = pickSpreadNodes(nodes, CONFIG.globalLandmarksPerContinent);
+        for (const node of spread) {
+          landmarks.push({
+            ...node.representative,
+            landmarkContinent: continent
+          });
         }
-
-        if (!groups.has(result.country)) {
-          groups.set(result.country, []);
-        }
-
-        groups.get(result.country).push(result);
       }
 
-      return [...groups.entries()]
-        .map(([country, countryResults]) => buildRankingEntry("country", country, countryResults))
-        .sort(compareRankingEntries);
+      return uniqueById(landmarks);
     }
 
-    function rankCities(results) {
-      const groups = new Map();
+    function rankGroups(results, groupKey) {
+      const successful = results.filter(r => r && r.ok);
+      const byGroup = groupBy(successful, groupKey);
 
-      for (const result of results) {
-        if (!result.region) {
-          continue;
-        }
+      return [...byGroup.entries()]
+        .map(([group, groupResults]) => {
+          const clean = groupResults.filter(r => !r.suspiciousTiming);
+          const rankedSource = clean.length ? clean : groupResults;
+          const sorted = [...rankedSource].sort((a, b) => a.scoreMs - b.scoreMs);
 
-        const key = result.region;
-        if (!groups.has(key)) {
-          groups.set(key, []);
-        }
-
-        groups.get(key).push(result);
-      }
-
-      return [...groups.entries()]
-        .map(([region, regionResults]) => buildRankingEntry("region", region, regionResults))
-        .sort(compareRankingEntries);
+          return {
+            [groupKey.name || "group"]: group,
+            group,
+            probeCount: groupResults.length,
+            successfulProbes: groupResults.length,
+            suspiciousProbes: groupResults.filter(r => r.suspiciousTiming).length,
+            noisyProbes: groupResults.filter(r => r.timingQuality === "noisy").length,
+            bestProbe: compactResult(sorted[0]),
+            bestProbeWasSuspicious: Boolean(sorted[0]?.suspiciousTiming),
+            probes: [...groupResults]
+              .sort((a, b) => a.scoreMs - b.scoreMs)
+              .map(compactResult)
+          };
+        })
+        .sort((a, b) => {
+          if (!a.bestProbe && !b.bestProbe) return 0;
+          if (!a.bestProbe) return 1;
+          if (!b.bestProbe) return -1;
+          return a.bestProbe.scoreMs - b.bestProbe.scoreMs;
+        });
     }
 
-    function buildRankingEntry(key, value, results) {
-      const sorted = sortByScore(results);
-      const bestClean = sorted.find(result => result.ok && !result.suspiciousTiming && Number.isFinite(result.scoreMs));
-      const bestAny = sorted.find(result => result.ok && Number.isFinite(result.scoreMs));
-      const best = bestClean || bestAny;
-
-      return {
-        [key]: value,
-        probeCount: results.length,
-        successfulProbes: results.filter(result => result.ok).length,
-        suspiciousProbes: results.filter(result => result.suspiciousTiming).length,
-        bestProbe: best ? pickRankingProbe(best) : null,
-        bestProbeWasSuspicious: Boolean(best && best.suspiciousTiming),
-        probes: sorted.map(pickRankingProbe)
-      };
-    }
-
-    function pickRankingProbe(result) {
-      return {
-        id: result.id,
-        country: result.country,
-        region: result.region,
-        continent: result.continent,
-        ok: result.ok,
-        minMs: result.minMs,
-        maxMs: result.maxMs,
-        medianMs: result.medianMs,
-        jitterMs: result.jitterMs,
-        scoreMs: result.scoreMs,
-        suspiciousTiming: result.suspiciousTiming,
-        timingQuality: result.timingQuality,
-        samplesMs: result.samplesMs
-      };
-    }
-
-    function compareRankingEntries(a, b) {
-      const aa = a.bestProbe ? rankingScore(a.bestProbe, true) : Infinity;
-      const bb = b.bestProbe ? rankingScore(b.bestProbe, true) : Infinity;
-      return aa - bb;
-    }
-
-    function getTopCountries(countryRanking, count) {
-      return countryRanking
-        .filter(entry => entry.bestProbe)
-        .slice(0, count)
-        .map(entry => entry.country);
-    }
-
-    function getCountryDetailProbes(candidateCountries) {
-      const countries = new Set(candidateCountries);
-      return probes.filter(probe => countries.has(probe.country));
-    }
-
-    function getCityRefinementProbes(bestCountry, detailResults, cityCount) {
-      if (!bestCountry) {
-        return [];
-      }
-
-      const bestCountryResults = detailResults.filter(result => countryMatches(result.country, bestCountry));
-      const cityRanking = rankCities(bestCountryResults);
-      const selectedRegions = new Set(
-        cityRanking
-          .filter(entry => entry.bestProbe)
-          .slice(0, cityCount)
-          .map(entry => entry.region)
-      );
-
-      return getCountryProbes(bestCountry).filter(probe => selectedRegions.has(probe.region));
-    }
-
-    function isSuspiciousTiming(result) {
-      if (!result || !result.ok || !Array.isArray(result.samplesMs) || result.samplesMs.length < 3) {
-        return false;
-      }
-
-      const allSamplesHigh = result.samplesMs.every(ms => ms >= 1000);
-      const veryHigh = Number.isFinite(result.minMs) && result.minMs >= 1000;
-      const tooStableForHugeDelay = Number.isFinite(result.jitterMs) && result.jitterMs <= 25;
-      const timeoutLike = Number.isFinite(result.maxMs) && result.maxMs >= TIMEOUT_MS - 250;
-
-      return (allSamplesHigh && tooStableForHugeDelay) || (veryHigh && tooStableForHugeDelay) || timeoutLike;
-    }
-
-    function getTimingQuality(result) {
-      if (!result.ok) return "failed";
-      if (isSuspiciousTiming(result)) return "suspicious";
-      if (Number.isFinite(result.jitterMs) && Number.isFinite(result.minMs) && result.jitterMs > Math.max(100, result.minMs * 2)) {
-        return "noisy";
-      }
-      return "normal";
-    }
-
-    function estimateByWeightedCentroid(results, latencyField = "scoreMs") {
-      let usable = results
-        .filter(r => r.ok && !r.suspiciousTiming && Number.isFinite(r[latencyField]) && Number.isFinite(r.lat) && Number.isFinite(r.lon))
-        .sort((a, b) => a[latencyField] - b[latencyField]);
-
-      const excludedSuspiciousCount = results.filter(r => r.suspiciousTiming).length;
-      let usedSuspiciousFallback = false;
-
-      if (usable.length < 3) {
-        usable = results
-          .filter(r => r.ok && Number.isFinite(r[latencyField]) && Number.isFinite(r.lat) && Number.isFinite(r.lon))
-          .sort((a, b) => a[latencyField] - b[latencyField]);
-        usedSuspiciousFallback = true;
-      }
-
-      if (usable.length < 3) {
-        return {
-          ok: false,
-          basedOn: latencyField,
-          reason: "Need at least 3 successful probe measurements."
-        };
-      }
-
-      const closest = usable.slice(0, CLOSEST_PROBES_TO_USE);
-
-      let sumWeight = 0;
-      let sumLat = 0;
-      let sumLon = 0;
-
-      for (const r of closest) {
-        const latency = r[latencyField];
-        const weight = 1 / Math.max(1, latency * latency);
-        sumWeight += weight;
-        sumLat += r.lat * weight;
-        sumLon += r.lon * weight;
-      }
-
-      const best = usable[0];
-      const second = usable[1];
-      const lat = +(sumLat / sumWeight).toFixed(4);
-      const lon = +(sumLon / sumWeight).toFixed(4);
-
-      return {
-        ok: true,
-        basedOn: latencyField,
-        warning: "This is network-proximity estimation, not real geolocation.",
-        approximateLocation: `${lat}, ${lon}`,
-        approximateLat: lat,
-        approximateLon: lon,
-        nearestCountry: best.country,
-        nearestRegion: best.region,
-        nearestContinent: best.continent,
-        nearestProbe: best.id,
-        confidence:
-          second && second[latencyField] - best[latencyField] > 35 && !usedSuspiciousFallback
-            ? "medium"
-            : "low",
-        excludedSuspiciousCount,
-        usedSuspiciousFallback,
-        closestUsed: closest.map(pickSummaryProbe)
-      };
-    }
-
-	function calculateConfidence(closestUsed, finalCountryRanking, selectedCountry, selectedRegion) {
-	const clean = closestUsed.filter(r =>
-		r.ok &&
-		!r.suspiciousTiming &&
-		r.timingQuality !== "suspicious"
-	);
-
-	if (clean.length < 3) return "low";
-
-	const top5 = clean.slice(0, 5);
-
-	const sameCountryCount = top5.filter(r => r.country === selectedCountry).length;
-	const sameRegionCount = top5.filter(r => r.region === selectedRegion).length;
-
-	const bestScore = top5[0]?.scoreMs ?? Infinity;
-	const fifthScore = top5[4]?.scoreMs ?? Infinity;
-	const spreadMs = fifthScore - bestScore;
-
-	const countryRank = finalCountryRanking.findIndex(r => r.country === selectedCountry);
-	const bestCountry = finalCountryRanking[0];
-	const secondCountry = finalCountryRanking[1];
-
-	const countryGap =
-		bestCountry && secondCountry
-		? secondCountry.bestProbe.scoreMs - bestCountry.bestProbe.scoreMs
-		: 0;
-
-	if (
-		sameCountryCount >= 5 &&
-		sameRegionCount >= 4 &&
-		bestScore <= 20 &&
-		spreadMs <= 10 &&
-		countryRank === 0 &&
-		countryGap >= 5
-	) {
-		return "very high";
-	}
-
-	if (
-		sameCountryCount >= 4 &&
-		sameRegionCount >= 3 &&
-		bestScore <= 30 &&
-		spreadMs <= 25 &&
-		countryRank === 0
-	) {
-		return "high";
-	}
-
-	if (
-		sameCountryCount >= 3 &&
-		bestScore <= 50 &&
-		countryRank <= 1
-	) {
-		return "medium";
-	}
-
-	return "low";
-	}
-
-    function summarizeResults(results) {
-      const successful = results.filter(r => r.ok).length;
-      const failed = results.length - successful;
-      const sortedByScore = sortByScore(results);
-      const sortedByMin = [...results].sort((a, b) => {
-        const aa = Number.isFinite(a.minMs) ? a.minMs : Infinity;
-        const bb = Number.isFinite(b.minMs) ? b.minMs : Infinity;
-        return aa - bb;
-      });
-
-      return {
-        totalProbes: results.length,
-        successfulProbes: successful,
-        failedProbes: failed,
-        suspiciousProbes: results.filter(r => r.suspiciousTiming).length,
-        bestByPreferredScore: sortedByScore[0]?.ok ? pickSummaryProbe(sortedByScore[0]) : null,
-        fastestByLowestMeasurement: sortedByMin[0]?.ok ? pickSummaryProbe(sortedByMin[0]) : null,
-        noisiestSuccessfulProbes: [...results]
-          .filter(r => r.ok && Number.isFinite(r.jitterMs))
-          .sort((a, b) => b.jitterMs - a.jitterMs)
-          .slice(0, 5)
-          .map(pickSummaryProbe),
-        suspiciousSuccessfulProbes: [...results]
-          .filter(r => r.ok && r.suspiciousTiming)
-          .sort((a, b) => a.scoreMs - b.scoreMs)
-          .slice(0, 10)
-          .map(pickSummaryProbe)
-      };
-    }
-
-    function pickSummaryProbe(r) {
+    function compactResult(r) {
+      if (!r) return null;
       return {
         id: r.id,
         country: r.country,
         region: r.region,
         continent: r.continent,
+        ok: r.ok,
         minMs: r.minMs,
         maxMs: r.maxMs,
         medianMs: r.medianMs,
         jitterMs: r.jitterMs,
+        rawJitterMs: r.rawJitterMs,
         scoreMs: r.scoreMs,
         suspiciousTiming: r.suspiciousTiming,
         timingQuality: r.timingQuality,
@@ -1634,206 +1363,642 @@
       };
     }
 
-    function renderProgress(stage, completed, total, extra = "") {
-      out.textContent = `${stage}: measured ${completed}/${total}${extra}`;
+    function nodeForProbeId(nodes, probeId) {
+      return nodes.find(node => node.probes.some(p => p.id === probeId));
+    }
+
+    function getNodeScore(node, cityResultByKey) {
+      const result = cityResultByKey.get(node.key);
+      return result?.scoreMs ?? Infinity;
+    }
+
+    function pickSpatiallyDiverseCandidates(candidates, limit, minDistanceKm) {
+      const sorted = [...candidates].sort((a, b) => a.frontierScore - b.frontierScore);
+      const selected = [];
+
+      for (const candidate of sorted) {
+        if (selected.length >= limit) break;
+
+        const tooClose = selected.some(existing =>
+          haversineKm(candidate.node.lat, candidate.node.lon, existing.node.lat, existing.node.lon) < minDistanceKm
+        );
+
+        if (!tooClose) selected.push(candidate);
+      }
+
+      for (const candidate of sorted) {
+        if (selected.length >= limit) break;
+        if (!selected.some(existing => existing.node.key === candidate.node.key)) {
+          selected.push(candidate);
+        }
+      }
+
+      return selected.slice(0, limit).map(c => c.node);
+    }
+
+    function selectFrontierCandidates(nodes, measuredKeys, cityResultByKey) {
+      const measuredNodes = nodes
+        .filter(node => measuredKeys.has(node.key) && cityResultByKey.has(node.key))
+        .sort((a, b) => getNodeScore(a, cityResultByKey) - getNodeScore(b, cityResultByKey));
+
+      const anchors = measuredNodes.slice(0, CONFIG.beamSize);
+      const unmeasured = nodes.filter(node => !measuredKeys.has(node.key));
+      const candidateMap = new Map();
+
+      function addCandidate(node, anchor, kind, extraPenalty = 0) {
+        const distanceKm = haversineKm(anchor.lat, anchor.lon, node.lat, node.lon);
+        const existing = candidateMap.get(node.key);
+        const frontierScore = distanceKm + extraPenalty;
+
+        if (!existing || frontierScore < existing.frontierScore) {
+          candidateMap.set(node.key, {
+            node,
+            anchorKey: anchor.key,
+            kind,
+            distanceKm,
+            frontierScore
+          });
+        }
+      }
+
+      for (const anchor of anchors) {
+        const nearest = unmeasured
+          .map(node => ({
+            node,
+            distanceKm: haversineKm(anchor.lat, anchor.lon, node.lat, node.lon)
+          }))
+          .sort((a, b) => a.distanceKm - b.distanceKm)
+          .slice(0, CONFIG.nearestNeighborsPerBeam);
+
+        for (const item of nearest) {
+          addCandidate(item.node, anchor, "nearest", 0);
+        }
+
+        // Directional sectors prevent the search from getting trapped around one dense city/country.
+        const sectorBest = new Map();
+        for (const node of unmeasured) {
+          const sector = Math.floor(bearingDeg(anchor.lat, anchor.lon, node.lat, node.lon) / 45);
+          const distanceKm = haversineKm(anchor.lat, anchor.lon, node.lat, node.lon);
+          const previous = sectorBest.get(sector);
+          if (!previous || distanceKm < previous.distanceKm) {
+            sectorBest.set(sector, { node, distanceKm });
+          }
+        }
+
+        for (const item of [...sectorBest.values()].slice(0, CONFIG.sectorNeighborsPerBeam)) {
+          addCandidate(item.node, anchor, "sector", 100);
+        }
+      }
+
+      return pickSpatiallyDiverseCandidates(
+        [...candidateMap.values()],
+        CONFIG.searchBatchSize,
+        CONFIG.spatialDiversityKm
+      );
+    }
+
+    function mergeResultsById(resultSets) {
+      const byId = new Map();
+
+      for (const set of resultSets) {
+        for (const result of set || []) {
+          if (!result || !result.id) continue;
+
+          const existing = byId.get(result.id);
+          if (!existing) {
+            byId.set(result.id, { ...result, stages: [...(result.stages || [])] });
+            continue;
+          }
+
+          // Keep the latest measurement but preserve stage history.
+          const stages = [...new Set([...(existing.stages || []), ...(result.stages || [])])];
+          byId.set(result.id, { ...result, stages });
+        }
+      }
+
+      return [...byId.values()];
+    }
+
+    function updateCityResult(cityResultByKey, node, result) {
+      const existing = cityResultByKey.get(node.key);
+      if (!existing || (result.ok && result.scoreMs < existing.scoreMs)) {
+        cityResultByKey.set(node.key, result);
+      }
+    }
+
+    async function coordinateGuidedSearch(selectedContinent, selectedContinentResults) {
+      const continentProbes = probes.filter(p => continentMatches(p.continent, selectedContinent));
+      const cityNodes = makeCityNodes(continentProbes);
+      const cityNodeByKey = new Map(cityNodes.map(node => [node.key, node]));
+
+      const measuredKeys = new Set();
+      const cityResultByKey = new Map();
+      const searchResults = [];
+      const waves = [];
+
+      const seedNodes = [];
+      for (const result of selectedContinentResults
+        .filter(r => r.ok)
+        .sort((a, b) => a.scoreMs - b.scoreMs)
+        .slice(0, CONFIG.globalSeedCount)) {
+        const node = nodeForProbeId(cityNodes, result.id);
+        if (node && !seedNodes.some(existing => existing.key === node.key)) {
+          seedNodes.push(node);
+          measuredKeys.add(node.key);
+          updateCityResult(cityResultByKey, node, result);
+        }
+      }
+
+      // If global landmarks did not map cleanly, fall back to spread seeds.
+      if (!seedNodes.length) {
+        for (const node of pickSpreadNodes(cityNodes, CONFIG.globalSeedCount)) {
+          seedNodes.push(node);
+        }
+      }
+
+      let bestScore = Infinity;
+      let noImprovementWaves = 0;
+
+      for (let wave = 1; wave <= CONFIG.maxSearchWaves; wave++) {
+        let candidates;
+
+        if (wave === 1) {
+          const frontier = selectFrontierCandidates(cityNodes, measuredKeys, cityResultByKey);
+          candidates = uniqueCityNodes([...seedNodes.filter(n => !cityResultByKey.has(n.key)), ...frontier]);
+        } else {
+          candidates = selectFrontierCandidates(cityNodes, measuredKeys, cityResultByKey);
+        }
+
+        candidates = candidates
+          .filter(node => !measuredKeys.has(node.key) || !cityResultByKey.has(node.key))
+          .slice(0, Math.max(0, CONFIG.maxCityNodesMeasured - measuredKeys.size));
+
+        if (!candidates.length) break;
+
+        const candidateProbes = candidates.map(node => node.representative);
+        out.textContent = `Stage 2/5: coordinate-guided ${selectedContinent} search, wave ${wave}: measuring ${candidateProbes.length}; city nodes measured ${measuredKeys.size}/${CONFIG.maxCityNodesMeasured}`;
+
+        const waveResults = await measureProbeSet(
+          candidateProbes,
+          `coordinate-search-wave-${wave}`,
+          CONFIG.searchConcurrency,
+          (done, total) => {
+            out.textContent = `Stage 2/5: coordinate-guided ${selectedContinent} search, wave ${wave}: measured ${done}/${total}; city nodes measured ${measuredKeys.size}/${CONFIG.maxCityNodesMeasured}`;
+          }
+        );
+
+        for (let i = 0; i < candidates.length; i++) {
+          const node = candidates[i];
+          const result = waveResults[i];
+          measuredKeys.add(node.key);
+          searchResults.push(result);
+          if (result && result.ok) updateCityResult(cityResultByKey, node, result);
+        }
+
+        const rankedNodes = [...cityResultByKey.entries()]
+          .map(([key, result]) => ({ key, result, node: cityNodeByKey.get(key) }))
+          .filter(item => item.result && item.result.ok)
+          .sort((a, b) => a.result.scoreMs - b.result.scoreMs);
+
+        const waveBest = rankedNodes[0]?.result?.scoreMs ?? Infinity;
+        if (waveBest + 1 < bestScore) {
+          bestScore = waveBest;
+          noImprovementWaves = 0;
+        } else {
+          noImprovementWaves += 1;
+        }
+
+        waves.push({
+          wave,
+          measuredThisWave: candidates.length,
+          totalCityNodesMeasured: measuredKeys.size,
+          best: compactResult(rankedNodes[0]?.result),
+          topNodes: rankedNodes.slice(0, 8).map(item => ({
+            key: item.key,
+            country: item.node?.country,
+            region: item.node?.region,
+            lat: item.node?.lat,
+            lon: item.node?.lon,
+            result: compactResult(item.result)
+          }))
+        });
+
+        const goodEnough =
+          bestScore <= CONFIG.excellentScoreMs &&
+          measuredKeys.size >= CONFIG.minSearchNodesBeforeStop &&
+          noImprovementWaves >= 1;
+
+        const stalledEnough =
+          measuredKeys.size >= CONFIG.minSearchNodesBeforeStop &&
+          noImprovementWaves >= CONFIG.stopAfterNoImprovementWaves;
+
+        if (goodEnough || stalledEnough || measuredKeys.size >= CONFIG.maxCityNodesMeasured) {
+          break;
+        }
+      }
+
+      return {
+        selectedContinentTotalProbeCount: continentProbes.length,
+        selectedContinentCityNodeCount: cityNodes.length,
+        searchResults,
+        cityNodes,
+        cityResultByKey,
+        measuredCityNodeCount: measuredKeys.size,
+        waves
+      };
+    }
+
+    function uniqueCityNodes(nodes) {
+      const seen = new Set();
+      const result = [];
+      for (const node of nodes) {
+        if (!node || seen.has(node.key)) continue;
+        seen.add(node.key);
+        result.push(node);
+      }
+      return result;
+    }
+
+    function buildDetailProbeSet(search, allResults) {
+      const cityRank = [...search.cityResultByKey.entries()]
+        .map(([key, result]) => ({
+          key,
+          result,
+          node: search.cityNodes.find(n => n.key === key)
+        }))
+        .filter(item => item.result && item.result.ok && item.node)
+        .sort((a, b) => a.result.scoreMs - b.result.scoreMs);
+
+      const topCountries = [];
+      for (const item of cityRank) {
+        if (!topCountries.includes(item.node.country)) topCountries.push(item.node.country);
+        if (topCountries.length >= CONFIG.detailTopCountries) break;
+      }
+
+      const detailProbes = [];
+
+      for (const country of topCountries) {
+        const countryNodes = search.cityNodes.filter(node => node.country === country);
+        const measuredCountryNodes = cityRank.filter(item => item.node.country === country);
+
+        const topRegions = [];
+        for (const item of measuredCountryNodes) {
+          if (!topRegions.includes(item.node.region)) topRegions.push(item.node.region);
+          if (topRegions.length >= CONFIG.detailTopRegionsPerCountry) break;
+        }
+
+        const countryProbes = probes.filter(p => p.country === country && continentMatches(p.continent, search.cityNodes[0]?.continent?.split("/")[0] || p.continent));
+
+        if (countryProbes.length <= CONFIG.maxFullCountryProbes) {
+          detailProbes.push(...countryProbes);
+        } else {
+          detailProbes.push(...countryProbes.filter(p => topRegions.includes(p.region)));
+
+          const alreadyRegions = new Set(topRegions);
+          const extraNodes = pickSpreadNodes(
+            countryNodes.filter(node => !alreadyRegions.has(node.region)),
+            Math.max(0, CONFIG.detailTopRegionsPerCountry)
+          );
+
+          for (const node of extraNodes) {
+            detailProbes.push(node.representative);
+          }
+        }
+      }
+
+      const alreadyMeasuredIds = new Set(allResults.map(r => r.id));
+      return uniqueById(detailProbes)
+        .filter(probe => !alreadyMeasuredIds.has(probe.id))
+        .slice(0, CONFIG.maxDetailProbesTotal);
+    }
+
+    async function retestBadButRelevant(results) {
+      const ranked = results
+        .filter(r => r && r.ok)
+        .sort((a, b) => a.scoreMs - b.scoreMs);
+
+      const relevant = ranked.slice(0, 20);
+      const toRetest = relevant
+        .filter(r => r.timingQuality === "noisy" || r.suspiciousTiming)
+        .slice(0, CONFIG.suspiciousRetestMax)
+        .map(r => probes.find(p => p.id === r.id))
+        .filter(Boolean);
+
+      if (!toRetest.length) return [];
+
+      out.textContent = `Stage 4/5: retesting ${toRetest.length} noisy/suspicious relevant probes at concurrency 1`;
+
+      return measureProbeSet(
+        toRetest,
+        "retest-relevant-noisy",
+        CONFIG.retestConcurrency,
+        (done, total) => {
+          out.textContent = `Stage 4/5: retesting noisy/suspicious relevant probes: ${done}/${total}`;
+        }
+      );
+    }
+
+    function weightedAverageLocation(results, basedOn) {
+      const usable = results.filter(r =>
+        r &&
+        r.ok &&
+        Number.isFinite(r.lat) &&
+        Number.isFinite(r.lon) &&
+        Number.isFinite(r[basedOn])
+      );
+
+      if (!usable.length) return null;
+
+      let totalWeight = 0;
+      let latSum = 0;
+      let lonSum = 0;
+
+      for (const result of usable) {
+        const value = Math.max(1, result[basedOn]);
+        const weight = 1 / (value * value);
+        totalWeight += weight;
+        latSum += Number(result.lat) * weight;
+        lonSum += Number(result.lon) * weight;
+      }
+
+      return {
+        lat: round(latSum / totalWeight, 4),
+        lon: round(lonSum / totalWeight, 4)
+      };
+    }
+
+    function calculateConfidence(closestUsed, finalCountryRanking, selectedCountry, selectedRegion) {
+      const clean = closestUsed.filter(r =>
+        r.ok &&
+        !r.suspiciousTiming &&
+        r.timingQuality !== "suspicious"
+      );
+
+      if (clean.length < 3) return "low";
+
+      const top5 = clean.slice(0, 5);
+      const sameCountryCount = top5.filter(r => r.country === selectedCountry).length;
+      const sameRegionCount = top5.filter(r => r.region === selectedRegion).length;
+
+      const bestScore = top5[0]?.scoreMs ?? Infinity;
+      const fifthScore = top5[4]?.scoreMs ?? Infinity;
+      const spreadMs = fifthScore - bestScore;
+
+      const countryRank = finalCountryRanking.findIndex(r => r.country === selectedCountry);
+      const bestCountry = finalCountryRanking[0];
+      const secondCountry = finalCountryRanking[1];
+
+      const countryGap =
+        bestCountry && secondCountry && bestCountry.bestProbe && secondCountry.bestProbe
+          ? secondCountry.bestProbe.scoreMs - bestCountry.bestProbe.scoreMs
+          : 0;
+
+      if (
+        sameCountryCount >= 5 &&
+        sameRegionCount >= 4 &&
+        bestScore <= 20 &&
+        spreadMs <= 12 &&
+        countryRank === 0 &&
+        countryGap >= 4
+      ) {
+        return "very high";
+      }
+
+      if (
+        sameCountryCount >= 4 &&
+        sameRegionCount >= 3 &&
+        bestScore <= 30 &&
+        spreadMs <= 30 &&
+        countryRank === 0
+      ) {
+        return "high";
+      }
+
+      if (
+        sameCountryCount >= 3 &&
+        bestScore <= 50 &&
+        countryRank <= 1
+      ) {
+        return "medium";
+      }
+
+      return "low";
+    }
+
+    function estimateFromResults(results, basedOn, finalCountryRanking) {
+      const okResults = results.filter(r => r && r.ok && Number.isFinite(r[basedOn]));
+
+      const clean = okResults.filter(r => !r.suspiciousTiming && r.timingQuality !== "suspicious");
+      const usable = clean.length >= 3 ? clean : okResults;
+
+      const ranked = [...usable].sort((a, b) => a[basedOn] - b[basedOn]);
+      const closestUsed = ranked.slice(0, 5);
+      const nearest = closestUsed[0];
+
+      if (!nearest) {
+        return {
+          ok: false,
+          basedOn,
+          warning: "No usable probes."
+        };
+      }
+
+      const approximate = weightedAverageLocation(closestUsed, basedOn);
+
+      return {
+        ok: true,
+        basedOn,
+        warning: "This is network-proximity estimation, not real geolocation.",
+        approximateLocation: `${approximate.lat}, ${approximate.lon}`,
+        approximateLat: approximate.lat,
+        approximateLon: approximate.lon,
+        nearestCountry: nearest.country,
+        nearestRegion: nearest.region,
+        nearestContinent: nearest.continent,
+        nearestProbe: nearest.id,
+        confidence: calculateConfidence(
+          closestUsed,
+          finalCountryRanking,
+          nearest.country,
+          nearest.region
+        ),
+        excludedSuspiciousCount: okResults.length - clean.length,
+        usedSuspiciousFallback: clean.length < 3,
+        closestUsed: closestUsed.map(compactResult)
+      };
+    }
+
+    function countryName(entry) {
+      return entry.group;
+    }
+
+    function continentName(entry) {
+      return entry.group;
+    }
+
+    function makeSummary(results) {
+      const successful = results.filter(r => r && r.ok);
+      const failed = results.filter(r => !r || !r.ok);
+
+      return {
+        totalProbes: results.length,
+        successfulProbes: successful.length,
+        failedProbes: failed.length,
+        suspiciousProbes: successful.filter(r => r.suspiciousTiming).length,
+        noisyProbes: successful.filter(r => r.timingQuality === "noisy").length,
+        bestByPreferredScore: compactResult([...successful].sort((a, b) => a.scoreMs - b.scoreMs)[0]),
+        fastestByLowestMeasurement: compactResult([...successful].sort((a, b) => a.minMs - b.minMs)[0])
+      };
     }
 
     runButton.onclick = async () => {
       runButton.disabled = true;
-      out.textContent = "Stage 1/5: measuring global continent landmarks...";
 
       try {
-        const allStages = [];
+        const probeIndex = makeProbeIndex();
 
-        const landmarkProbes = getGlobalLandmarkProbes();
-        const landmarkResults = await measureProbeSet(
-          landmarkProbes,
-          "continent-landmark",
-          PROBE_CONCURRENCY,
-          ({ completed, total }) => renderProgress("Stage 1/5: measuring global continent landmarks", completed, total)
+        out.textContent = "Stage 1/5: measuring global spread landmarks";
+
+        const globalLandmarks = buildGlobalLandmarks();
+        const globalResults = await measureProbeSet(
+          globalLandmarks,
+          "global-spread-landmark",
+          CONFIG.globalConcurrency,
+          (done, total) => {
+            out.textContent = `Stage 1/5: global spread landmarks measured ${done}/${total}`;
+          }
         );
-        allStages.push(...landmarkResults.map(result => ({ ...result, group: "continent-landmark" })));
 
-        const continentRanking = rankContinents(landmarkResults);
-        const selectedContinent = continentRanking.find(entry => entry.bestProbe)?.continent;
+        const continentRanking = rankGroups(
+          globalResults.map(r => ({
+            ...r,
+            effectiveContinent: r.landmarkContinent || String(r.continent || "").split("/")[0]
+          })),
+          function continent(r) { return r.effectiveContinent; }
+        );
+
+        const selectedContinent = continentName(continentRanking[0]);
+        const selectedContinentResults = globalResults
+          .filter(r => r.ok && continentMatches(r.continent, selectedContinent))
+          .sort((a, b) => a.scoreMs - b.scoreMs);
 
         if (!selectedContinent) {
-          throw new Error("No successful global landmark measurements.");
+          throw new Error("Could not select continent.");
         }
 
-        const continentProbes = getContinentProbes(selectedContinent);
-        const sampledCountryProbes = sampleSpreadByCountry(continentProbes, COUNTRY_SAMPLE_PROBES_PER_COUNTRY);
+        const search = await coordinateGuidedSearch(selectedContinent, selectedContinentResults);
 
-        out.textContent =
-          `Stage 2/5: ${selectedContinent} selected. ` +
-          `Measuring up to ${COUNTRY_SAMPLE_PROBES_PER_COUNTRY} spread probes per country ` +
-          `(${sampledCountryProbes.length}/${continentProbes.length} probes)...`;
+        let allMeasuredResults = mergeResultsById([globalResults, search.searchResults]);
 
-        let countrySampleResults = await measureProbeSet(
-          sampledCountryProbes,
-          "country-sample-spread",
-          PROBE_CONCURRENCY,
-          ({ completed, total }) => renderProgress(
-            `Stage 2/5: country sampling in ${selectedContinent}`,
-            completed,
-            total
-          )
+        const detailProbeSet = buildDetailProbeSet(search, allMeasuredResults);
+        out.textContent = `Stage 3/5: detail expansion for best nearby countries/regions: ${detailProbeSet.length} probes`;
+
+        const detailResults = await measureProbeSet(
+          detailProbeSet,
+          "best-nearby-detail-expansion",
+          CONFIG.detailConcurrency,
+          (done, total) => {
+            out.textContent = `Stage 3/5: detail expansion measured ${done}/${total}`;
+          }
         );
-        allStages.push(...countrySampleResults.map(result => ({ ...result, group: "country-sample-spread" })));
 
-        const countrySampleRetest = await retestSuspiciousResults(
-          countrySampleResults,
-          "country-sample-suspicious-retest",
-          ({ completed, total }) => renderProgress(
-            "Stage 2b/5: retesting suspicious sampled probes with concurrency 1",
-            completed,
-            total
-          )
+        allMeasuredResults = mergeResultsById([allMeasuredResults, detailResults]);
+
+        const retestResults = await retestBadButRelevant(allMeasuredResults);
+        allMeasuredResults = mergeResultsById([allMeasuredResults, retestResults]);
+
+        out.textContent = "Stage 5/5: building estimate";
+
+        const finalCountryRanking = rankGroups(
+          allMeasuredResults.filter(r => r.ok && continentMatches(r.continent, selectedContinent)),
+          function country(r) { return r.country; }
         );
-        countrySampleResults = countrySampleRetest.results;
-        allStages.push(...countrySampleRetest.retested.map(result => ({ ...result, group: "country-sample-suspicious-retest" })));
 
-        const countrySampleRanking = rankCountries(countrySampleResults);
-        const candidateCountries = getTopCountries(countrySampleRanking, TOP_COUNTRIES_TO_EXPAND);
-
-        if (!candidateCountries.length) {
-          throw new Error("No successful country sample measurements.");
-        }
-
-        const detailProbes = getCountryDetailProbes(candidateCountries);
-        out.textContent =
-          `Stage 3/5: expanding top ${candidateCountries.length} countries ` +
-          `(${candidateCountries.join(", ")}); measuring ${detailProbes.length} probes...`;
-
-        let countryDetailResults = await measureProbeSet(
-          detailProbes,
-          "top-country-all-probes",
-          PROBE_CONCURRENCY,
-          ({ completed, total }) => renderProgress(
-            `Stage 3/5: expanding countries ${candidateCountries.join(", ")}`,
-            completed,
-            total
-          )
+        const selectedCountry = countryName(finalCountryRanking[0]);
+        const finalRegionRanking = rankGroups(
+          allMeasuredResults.filter(r => r.ok && r.country === selectedCountry),
+          function region(r) { return r.region; }
         );
-        allStages.push(...countryDetailResults.map(result => ({ ...result, group: "top-country-all-probes" })));
 
-        const countryDetailRetest = await retestSuspiciousResults(
-          countryDetailResults,
-          "top-country-suspicious-retest",
-          ({ completed, total }) => renderProgress(
-            "Stage 3b/5: retesting suspicious top-country probes with concurrency 1",
-            completed,
-            total
-          )
-        );
-        countryDetailResults = countryDetailRetest.results;
-        allStages.push(...countryDetailRetest.retested.map(result => ({ ...result, group: "top-country-suspicious-retest" })));
+        const selectedRegion = finalRegionRanking[0]?.group;
 
-        const countryDetailRanking = rankCountries(countryDetailResults);
-        const selectedCountry = countryDetailRanking.find(entry => entry.bestProbe)?.country || candidateCountries[0];
+        const finalResults = allMeasuredResults
+          .filter(r => r.ok && continentMatches(r.continent, selectedContinent))
+          .sort((a, b) => a.scoreMs - b.scoreMs);
 
-        const cityRefinementProbes = getCityRefinementProbes(selectedCountry, countryDetailResults, TOP_CITIES_TO_REFINE);
-        out.textContent =
-          `Stage 4/5: refining best country (${selectedCountry}); ` +
-          `measuring all probes in top ${TOP_CITIES_TO_REFINE} city/cities (${cityRefinementProbes.length} probes)...`;
-
-        let cityRefinementResults = [];
-        if (cityRefinementProbes.length) {
-          cityRefinementResults = await measureProbeSet(
-            cityRefinementProbes,
-            "best-country-top-city-refinement",
-            REFINEMENT_CONCURRENCY,
-            ({ completed, total }) => renderProgress(
-              `Stage 4/5: city refinement in ${selectedCountry}`,
-              completed,
-              total
-            )
-          );
-          allStages.push(...cityRefinementResults.map(result => ({ ...result, group: "best-country-top-city-refinement" })));
-        }
-
-        const cityRetest = await retestSuspiciousResults(
-          cityRefinementResults,
-          "best-city-suspicious-retest",
-          ({ completed, total }) => renderProgress(
-            "Stage 4b/5: retesting suspicious city probes with concurrency 1",
-            completed,
-            total
-          )
-        );
-        cityRefinementResults = cityRetest.results;
-        allStages.push(...cityRetest.retested.map(result => ({ ...result, group: "best-city-suspicious-retest" })));
-
-        const finalResults = sortByScore(replaceResultsById(countryDetailResults, cityRefinementResults));
-        const finalCountryRanking = rankCountries(finalResults);
-        const finalCityRanking = rankCities(finalResults.filter(result => countryMatches(result.country, selectedCountry)));
-
-        const fromLowest = estimateByWeightedCentroid(finalResults, "minMs");
-        const fromHighest = estimateByWeightedCentroid(finalResults, "maxMs");
-        const fromMedian = estimateByWeightedCentroid(finalResults, "medianMs");
-        const fromScore = estimateByWeightedCentroid(finalResults, "scoreMs");
-
-        const allMeasuredResults = sortByScore(allStages, { preferClean: false });
+        const estimate = {
+          approximateLocation: estimateFromResults(finalResults, "scoreMs", finalCountryRanking).approximateLocation,
+          preferredBasis: "scoreMs = robust min + trimmed-jitter penalty; coordinate-guided nearest-neighbour search; noisy/suspicious timings retested when relevant",
+          preferred: estimateFromResults(finalResults, "scoreMs", finalCountryRanking),
+          comparison: {
+            fromLowestMeasurements: estimateFromResults(finalResults, "minMs", finalCountryRanking),
+            fromHighestMeasurements: estimateFromResults(finalResults, "maxMs", finalCountryRanking),
+            fromMedianMeasurements: estimateFromResults(finalResults, "medianMs", finalCountryRanking),
+            fromPreferredScore: estimateFromResults(finalResults, "scoreMs", finalCountryRanking)
+          }
+        };
 
         out.textContent = JSON.stringify({
-          estimate: {
-            approximateLocation: fromScore.ok ? fromScore.approximateLocation : null,
-            preferredBasis: "scoreMs = minMs + jitterMs*0.03; suspicious timings excluded when enough clean probes exist",
-            preferred: fromScore,
-            comparison: {
-              fromLowestMeasurements: fromLowest,
-              fromHighestMeasurements: fromHighest,
-              fromMedianMeasurements: fromMedian,
-              fromPreferredScore: fromScore
-            }
-          },
+          estimate,
           narrowing: {
-            strategy:
-              "Hierarchical capped expansion: global landmarks -> selected-continent country sampling with up to 3 geographically spread probes per country -> expand top countries -> refine top cities -> retest suspicious high/stable timings at concurrency 1.",
+            strategy: "Coordinate-guided nearest-neighbour expansion: global spread landmarks -> choose best continent -> expand from best continent city nodes by nearest graph/sector neighbours -> detail expand only best nearby countries/regions -> retest relevant noisy probes.",
             selectedContinent,
-            candidateCountries,
             selectedCountry,
-            globalLandmarkProbeCount: landmarkProbes.length,
-            selectedContinentTotalProbeCount: continentProbes.length,
-            countrySampleProbeCount: sampledCountryProbes.length,
-            countryDetailProbeCount: detailProbes.length,
-            cityRefinementProbeCount: cityRefinementProbes.length,
+            selectedRegion,
+            globalLandmarkProbeCount: globalLandmarks.length,
+            selectedContinentTotalProbeCount: search.selectedContinentTotalProbeCount,
+            selectedContinentCityNodeCount: search.selectedContinentCityNodeCount,
+            coordinateSearchMeasuredCityNodeCount: search.measuredCityNodeCount,
+            detailProbeCount: detailProbeSet.length,
+            retestProbeCount: retestResults.length,
             measuredProbeCount: allMeasuredResults.length,
-            reusedMeasurements: 0,
             constants: {
-              sampleCount: SAMPLE_COUNT,
-              globalLandmarksPerContinent: GLOBAL_LANDMARKS_PER_CONTINENT,
-              countrySampleProbesPerCountry: COUNTRY_SAMPLE_PROBES_PER_COUNTRY,
-              topCountriesToExpand: TOP_COUNTRIES_TO_EXPAND,
-              topCitiesToRefine: TOP_CITIES_TO_REFINE,
-              probeConcurrency: PROBE_CONCURRENCY,
-              refinementConcurrency: REFINEMENT_CONCURRENCY,
-              retestConcurrency: RETEST_CONCURRENCY,
-              sampleMode: "sequential per probe; bounded parallelism across probes"
+              sampleCount: CONFIG.sampleCount,
+              globalLandmarksPerContinent: CONFIG.globalLandmarksPerContinent,
+              globalSeedCount: CONFIG.globalSeedCount,
+              searchBatchSize: CONFIG.searchBatchSize,
+              beamSize: CONFIG.beamSize,
+              nearestNeighborsPerBeam: CONFIG.nearestNeighborsPerBeam,
+              sectorNeighborsPerBeam: CONFIG.sectorNeighborsPerBeam,
+              maxSearchWaves: CONFIG.maxSearchWaves,
+              maxCityNodesMeasured: CONFIG.maxCityNodesMeasured,
+              detailTopCountries: CONFIG.detailTopCountries,
+              detailTopRegionsPerCountry: CONFIG.detailTopRegionsPerCountry,
+              maxFullCountryProbes: CONFIG.maxFullCountryProbes,
+              maxDetailProbesTotal: CONFIG.maxDetailProbesTotal,
+              globalConcurrency: CONFIG.globalConcurrency,
+              searchConcurrency: CONFIG.searchConcurrency,
+              detailConcurrency: CONFIG.detailConcurrency,
+              retestConcurrency: CONFIG.retestConcurrency,
+              sampleMode: "sequential samples per probe; bounded parallelism across probes"
             },
             continentRanking,
-            countrySampleRanking,
-            countryDetailRanking,
+            coordinateSearchWaves: search.waves,
             finalCountryRanking,
-            finalCityRanking
+            finalRegionRanking
           },
-          summary: summarizeResults(finalResults),
-          measuredSummary: summarizeResults(allMeasuredResults),
-          results: finalResults,
-          sampledCountryResults: sortByScore(countrySampleResults),
-          countryDetailResults: sortByScore(countryDetailResults),
-          cityRefinementResults: sortByScore(cityRefinementResults),
-          allMeasuredResults
+          summary: makeSummary(finalResults),
+          measuredSummary: makeSummary(allMeasuredResults),
+          results: finalResults.map(compactResult),
+          allMeasuredResults: allMeasuredResults
+            .sort((a, b) => {
+              if (a.ok && b.ok) return a.scoreMs - b.scoreMs;
+              if (a.ok) return -1;
+              if (b.ok) return 1;
+              return 0;
+            })
+            .map(compactResult)
         }, null, 2);
       } catch (err) {
         out.textContent = JSON.stringify({
           ok: false,
-          error: err.message || String(err)
+          error: err.stack || err.message || String(err)
         }, null, 2);
       } finally {
         runButton.disabled = false;
       }
     };
+
   </script>
 </body>
 </html>
