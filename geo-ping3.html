@@ -752,6 +752,24 @@
       { id: "oceania-sydney-linode", continent: "Oceania", region: "Sydney", lat: -33.8688, lon: 151.2093, url: "https://syd1.speedtest.telstra.net:8080/hello?nocache" },
       { id: "na-us-east-linode", continent: "North America", region: "Newark / New York", lat: 40.7357, lon: -74.1724, url: "https://speedgauge2.optonline.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
       { id: "na-us-west-vultr", continent: "North America", region: "Los Angeles", lat: 34.0522, lon: -118.2437, url: "https://la-ookla.geolinks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-north-america-chicago", continent: "North America", region: "Chicago", lat: 41.8832, lon: -87.6324, url: "https://ord-cos1-ookla-1.99.network.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-north-america-toronto", continent: "North America", region: "Toronto", lat: 43.6532, lon: -79.3832, url: "https://speedtest2-tor.teksavvy.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-north-america-mexico-city", continent: "North America", region: "Mexico City", lat: 19.4326, lon: -99.1332, url: "https://mivelocidadmex.axtel.com.mx:8080/hello?nocache" },
+      { id: "global-south-america-buenos-aires", continent: "South America", region: "Buenos Aires", lat: -34.6036, lon: -58.3817, url: "https://velocidad.telecentro.net.ar.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-south-america-santiago", continent: "South America", region: "Santiago", lat: -33.4079, lon: -70.5451, url: "https://speedtest-scl.grupocg.cl.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-south-america-lima", continent: "South America", region: "Lima", lat: -12.0433, lon: -77.0283, url: "https://speedtest.wowperu.pe.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-south-america-rio-de-janeiro", continent: "South America", region: "Rio de Janeiro", lat: -22.3534, lon: -42.7076, url: "https://speedtest1.deepnetworks.com.br.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-asia-seoul", continent: "Asia", region: "Seoul", lat: 37.5652, lon: 126.9774, url: "https://seoul.speedtest.gslnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-asia-mumbai", continent: "Asia", region: "Mumbai", lat: 19.1839, lon: 72.8584, url: "https://speedtest.logonbroadband.in.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-asia-dubai", continent: "Asia", region: "Dubai", lat: 25.2500, lon: 55.3000, url: "https://speedtest1.etisalat.ae:8080/hello?nocache" },
+      { id: "global-oceania-melbourne", continent: "Oceania", region: "Melbourne", lat: -37.8136, lon: 144.9631, url: "https://speed.mel.aussiebroadband.com.au.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-oceania-auckland", continent: "Oceania", region: "Auckland", lat: -36.8509, lon: 174.7645, url: "https://ooklanow-akl.as55850.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-oceania-perth", continent: "Oceania", region: "Perth", lat: -31.9505, lon: 115.8605, url: "https://speed.per.aussiebroadband.com.au.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-oceania-brisbane", continent: "Oceania", region: "Brisbane", lat: -27.4698, lon: 153.0251, url: "https://speed.bne.aussiebroadband.com.au.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-africa-cairo", continent: "Africa", region: "Cairo", lat: 30.0566, lon: 31.2262, url: "https://speedtestob.orange.eg.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-africa-lagos", continent: "Africa", region: "Lagos", lat: 6.5244, lon: 3.3792, url: "https://speedtest-oiadeyeye.lulifiber.com:8080/hello?nocache" },
+      { id: "global-africa-nairobi", continent: "Africa", region: "Nairobi", lat: -1.2833, lon: 36.8167, url: "https://speedtest.limesol.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "global-africa-cape-town", continent: "Africa", region: "Cape Town", lat: -33.9248, lon: 18.4240, url: "https://ctspeed.rain.co.za:8080/hello?nocache" },
 
       { id: "eu-vilnius-telia", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speed-vilnius.telia.lt:8080/hello?nocache" },
       { id: "eu-vilnius-cgates", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest-3.cgates.lt:8080/hello?nocache" },
@@ -794,6 +812,52 @@
     const SAMPLE_COUNT = 5;
     const TIMEOUT_MS = 3500;
     const CLOSEST_PROBES_TO_USE = 5;
+    const GLOBAL_LANDMARKS_PER_CONTINENT = 5;
+
+    const GLOBAL_LANDMARK_PROBE_IDS = {
+      "North America": [
+        "na-us-east-linode",
+        "na-us-west-vultr",
+        "global-north-america-chicago",
+        "global-north-america-toronto",
+        "global-north-america-mexico-city"
+      ],
+      "South America": [
+        "sa-sao-paulo-vultr",
+        "global-south-america-buenos-aires",
+        "global-south-america-santiago",
+        "global-south-america-lima",
+        "global-south-america-rio-de-janeiro"
+      ],
+      Europe: [
+        "eu-london-linode",
+        "eu-frankfurt-linode",
+        "eu-rome-fastweb",
+        "eu-oslo-telenor",
+        "istanbul-turknet"
+      ],
+      Asia: [
+        "asia-singapore-linode",
+        "asia-tokyo-linode",
+        "global-asia-seoul",
+        "global-asia-mumbai",
+        "global-asia-dubai"
+      ],
+      Oceania: [
+        "oceania-sydney-linode",
+        "global-oceania-melbourne",
+        "global-oceania-auckland",
+        "global-oceania-perth",
+        "global-oceania-brisbane"
+      ],
+      Africa: [
+        "af-johannesburg-vultr",
+        "global-africa-cairo",
+        "global-africa-lagos",
+        "global-africa-nairobi",
+        "global-africa-cape-town"
+      ]
+    };
 
     function sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
@@ -889,6 +953,136 @@
         failedSamples: errors.length,
         errors
       };
+    }
+
+    function sortByScore(results) {
+      return [...results].sort((a, b) => {
+        const aa = Number.isFinite(a.scoreMs) ? a.scoreMs : Infinity;
+        const bb = Number.isFinite(b.scoreMs) ? b.scoreMs : Infinity;
+        return aa - bb;
+      });
+    }
+
+    function uniqueById(items) {
+      return [...new Map(items.map(item => [item.id, item])).values()];
+    }
+
+    function continentMatches(probeContinent, selectedContinent) {
+      return String(probeContinent)
+        .split("/")
+        .map(part => part.trim())
+        .includes(selectedContinent);
+    }
+
+    function buildProbeIndex() {
+      return new Map(probes.map(probe => [probe.id, probe]));
+    }
+
+    function getGlobalLandmarkProbes() {
+      const probeById = buildProbeIndex();
+
+      return uniqueById(
+        Object.values(GLOBAL_LANDMARK_PROBE_IDS)
+          .flatMap(ids => ids.slice(0, GLOBAL_LANDMARKS_PER_CONTINENT))
+          .map(id => probeById.get(id))
+          .filter(Boolean)
+      );
+    }
+
+    function createMeasurementCache() {
+      return {
+        byId: new Map(),
+        byUrl: new Map(),
+        reusedMeasurements: 0
+      };
+    }
+
+    async function measureProbeWithCache(probe, cache, stage) {
+      if (cache.byId.has(probe.id)) {
+        const result = cache.byId.get(probe.id);
+        result.stages = [...new Set([...(result.stages || []), stage])];
+        cache.reusedMeasurements += 1;
+        return result;
+      }
+
+      if (cache.byUrl.has(probe.url)) {
+        const source = cache.byUrl.get(probe.url);
+        const result = {
+          ...source,
+          ...probe,
+          reusedFromProbe: source.id,
+          stages: [...new Set([...(source.stages || []), stage])]
+        };
+
+        cache.byId.set(probe.id, result);
+        cache.reusedMeasurements += 1;
+        return result;
+      }
+
+      const result = {
+        ...(await measureProbe(probe, SAMPLE_COUNT)),
+        stages: [stage]
+      };
+
+      cache.byId.set(probe.id, result);
+      cache.byUrl.set(probe.url, result);
+
+      return result;
+    }
+
+    async function measureProbeSet(probesToMeasure, cache, stage) {
+      return Promise.all(
+        uniqueById(probesToMeasure).map(probe => measureProbeWithCache(probe, cache, stage))
+      );
+    }
+
+    function rankContinents(results) {
+      const groups = new Map();
+
+      for (const result of results) {
+        if (!groups.has(result.continent)) {
+          groups.set(result.continent, []);
+        }
+
+        groups.get(result.continent).push(result);
+      }
+
+      return [...groups.entries()]
+        .map(([continent, continentResults]) => {
+          const sorted = sortByScore(continentResults);
+          const best = sorted.find(result => result.ok && Number.isFinite(result.scoreMs));
+
+          return {
+            continent,
+            probeCount: continentResults.length,
+            successfulProbes: continentResults.filter(result => result.ok).length,
+            bestProbe: best
+              ? {
+                  id: best.id,
+                  region: best.region,
+                  minMs: best.minMs,
+                  medianMs: best.medianMs,
+                  jitterMs: best.jitterMs,
+                  scoreMs: best.scoreMs
+                }
+              : null,
+            probes: sorted.map(result => ({
+              id: result.id,
+              region: result.region,
+              ok: result.ok,
+              scoreMs: result.scoreMs
+            }))
+          };
+        })
+        .sort((a, b) => {
+          const aa = Number.isFinite(a.bestProbe?.scoreMs) ? a.bestProbe.scoreMs : Infinity;
+          const bb = Number.isFinite(b.bestProbe?.scoreMs) ? b.bestProbe.scoreMs : Infinity;
+          return aa - bb;
+        });
+    }
+
+    function getContinentProbes(continent) {
+      return probes.filter(probe => continentMatches(probe.continent, continent));
     }
 
     function estimateByWeightedCentroid(results, latencyField = "scoreMs") {
@@ -1020,19 +1214,32 @@
 
     runButton.onclick = async () => {
       runButton.disabled = true;
-      out.textContent = "Measuring all probe locations in parallel...";
+      out.textContent = "Stage 1/2: measuring global continent landmarks...";
 
       try {
-        // Run all probe locations in parallel.
-        const results = await Promise.all(
-          probes.map(probe => measureProbe(probe, SAMPLE_COUNT))
+        const cache = createMeasurementCache();
+        const landmarkProbes = getGlobalLandmarkProbes();
+        const landmarkResults = await measureProbeSet(landmarkProbes, cache, "continent-landmark");
+        const continentRanking = rankContinents(landmarkResults);
+        const selectedContinent = continentRanking.find(entry => entry.bestProbe)?.continent;
+
+        if (!selectedContinent) {
+          throw new Error("No successful global landmark measurements.");
+        }
+
+        const continentProbes = getContinentProbes(selectedContinent);
+        out.textContent =
+          `Stage 2/2: ${selectedContinent} selected. ` +
+          `Measuring ${continentProbes.length} probes in that continent...`;
+
+        const continentResults = await measureProbeSet(
+          continentProbes,
+          cache,
+          "selected-continent-detail"
         );
 
-        const sortedResults = results.sort((a, b) => {
-          const aa = Number.isFinite(a.scoreMs) ? a.scoreMs : Infinity;
-          const bb = Number.isFinite(b.scoreMs) ? b.scoreMs : Infinity;
-          return aa - bb;
-        });
+        const sortedResults = sortByScore(continentResults);
+        const allMeasuredResults = sortByScore([...cache.byId.values()]);
 
         const fromLowest = estimateByWeightedCentroid(sortedResults, "minMs");
         const fromHighest = estimateByWeightedCentroid(sortedResults, "maxMs");
@@ -1042,7 +1249,7 @@
         out.textContent = JSON.stringify({
           estimate: {
             approximateLocation: fromScore.ok ? fromScore.approximateLocation : null,
-            preferredBasis: "scoreMs = minMs + jitterMs*0.1",
+            preferredBasis: "scoreMs = minMs + jitterMs*0.03",
             preferred: fromScore,
 
             comparison: {
@@ -1052,8 +1259,20 @@
               fromPreferredScore: fromScore
             }
           },
+          narrowing: {
+            strategy:
+              "Measure global landmarks first, choose the best continent, then expand only inside that continent.",
+            selectedContinent,
+            globalLandmarkProbeCount: landmarkProbes.length,
+            selectedContinentProbeCount: continentProbes.length,
+            measuredProbeCount: cache.byId.size,
+            reusedMeasurements: cache.reusedMeasurements,
+            continentRanking
+          },
           summary: summarizeResults(sortedResults),
-          results: sortedResults
+          measuredSummary: summarizeResults(allMeasuredResults),
+          results: sortedResults,
+          allMeasuredResults
         }, null, 2);
       } catch (err) {
         out.textContent = JSON.stringify({
