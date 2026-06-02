@@ -1,0 +1,313 @@
+<!doctype html>
+<html>
+<body>
+  <button id="run">Run latency location POC</button>
+  <pre id="out"></pre>
+
+  <script>
+    const probes = [
+      { id: "oceania-sydney-linode", continent: "Oceania", region: "Sydney", lat: -33.8688, lon: 151.2093, url: "https://syd1.speedtest.telstra.net:8080/hello?nocache" },
+      { id: "na-us-east-linode", continent: "North America", region: "Newark / New York", lat: 40.7357, lon: -74.1724, url: "https://speedgauge2.optonline.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "na-us-west-vultr", continent: "North America", region: "Los Angeles", lat: 34.0522, lon: -118.2437, url: "https://la-ookla.geolinks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "eu-vilnius-cgates", continent: "Europe", region: "Vilnius", lat: 54.67378660032983, lon: 25.261155515136494, url: "https://speedtest-3.cgates.lt:8080/hello?nocache" },
+    //   { id: "eu-kaunas-cgates", continent: "Europe", region: "Kaunas", lat: 54.9138, lon: 23.9333, url: "https://speedtest-2.cgates.lt:8080/hello?nocache" },
+      { id: "eu-moscow-firststep", continent: "Europe", region: "Moscow", lat: 55.76258655550245, lon: 37.590838795098115, url: "https://ookla-speedtest.fsr.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-rome-fastweb", continent: "Europe", region: "Rome", lat: 41.92083789780521, lon: 12.490936898306725, url: "https://spd-pub-rm-01-01.fastwebnet.it:8080/hello?nocache" },
+      { id: "eu-frankfurt-linode", continent: "Europe", region: "Frankfurt", lat: 50.1109, lon: 8.6821, url: "https://speedtest.58243.as.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-london-linode", continent: "Europe", region: "London", lat: 51.5072, lon: -0.1276, url: "https://ab-thn-ookla01.air-band.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-oslo-telenor", continent: "Europe", region: "Oslo", lat: 59.913664908492876, lon: 10.750856571682311, url: "https://test.telenor.net:8080/hello?nocache" },
+      { id: "eu-krakow-wnet", continent: "Europe", region: "Krakow", lat: 50.0719615813893, lon: 19.989332246891628, url: "https://speedtest.w-net.eu.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-klaipeda-telia", continent: "Europe", region: "Klaipeda", lat: 55.71231910488327, lon: 21.13277197030626, url: "https://speed-klaipeda.telia.lt:8080/hello?nocache" },
+      { id: "eu-riga-tet", continent: "Europe", region: "Riga", lat: 57.0114, lon: 24.1207, url: "https://mini1.speedtest.lv.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "istanbul-turknet", continent: "Europe", region: "Istanbul", lat: 41.05353505992091, lon: 29.06566534729723, url: "https://speedtest.turk.net:8080/hello?nocache" },
+
+      { id: "asia-singapore-linode", continent: "Asia", region: "Singapore", lat: 1.3521, lon: 103.8198, url: "https://speedtest2.pacificinternet.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "asia-tokyo-linode", continent: "Asia", region: "Tokyo", lat: 35.6762, lon: 139.6503, url: "https://ty8.speedtest.gslnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+
+      { id: "sa-sao-paulo-vultr", continent: "South America", region: "São Paulo", lat: -23.5558, lon: -46.6396, url: "https://speedtest.choconet.com.br.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "af-johannesburg-vultr", continent: "Africa", region: "Johannesburg", lat: -26.2041, lon: 28.0473, url: "https://speed.korisp.com:8080/hello?nocache" }
+    ];
+
+    const out = document.getElementById("out");
+    const runButton = document.getElementById("run");
+
+    const SAMPLE_COUNT = 5;
+    const TIMEOUT_MS = 3500;
+    const CLOSEST_PROBES_TO_USE = 4;
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function appendCacheBust(url) {
+      const separator = url.includes("?") ? "&" : "?";
+      return url + separator + "cacheBust=" + crypto.randomUUID();
+    }
+
+    async function timeRequest(url, timeoutMs = TIMEOUT_MS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const start = performance.now();
+
+      try {
+        await fetch(appendCacheBust(url), {
+          method: "GET",
+          mode: "no-cors",
+          cache: "no-store",
+          credentials: "omit",
+          signal: controller.signal
+        });
+
+        return {
+          ok: true,
+          ms: performance.now() - start
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          ms: null,
+          error: err.name || String(err)
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function measureProbe(probe, samples = SAMPLE_COUNT) {
+      const errors = [];
+
+      // Warm-up request. This can absorb DNS/TLS setup noise.
+      // It is intentionally not included in the measured samples.
+      await timeRequest(probe.url);
+      await sleep(80);
+
+      // Run all samples for this single probe in parallel.
+      const sampleResults = await Promise.all(
+        Array.from({ length: samples }, () => timeRequest(probe.url))
+      );
+
+      const values = [];
+
+      for (const result of sampleResults) {
+        if (result.ok && Number.isFinite(result.ms)) {
+          values.push(result.ms);
+        } else {
+          errors.push(result.error || "failed");
+        }
+      }
+
+      values.sort((a, b) => a - b);
+
+      const minMs = values.length ? values[0] : null;
+      const maxMs = values.length ? values[values.length - 1] : null;
+      const medianMs = values.length ? values[Math.floor(values.length / 2)] : null;
+      const jitterMs = minMs === null || maxMs === null ? null : maxMs - minMs;
+      const scoreMs = medianMs === null || jitterMs === null ? null : minMs + jitterMs*0.05;
+
+      return {
+        ...probe,
+        ok: values.length > 0,
+
+        // Lowest observed measurement.
+        minMs: minMs === null ? null : Math.round(minMs),
+
+        // Highest observed measurement.
+        maxMs: maxMs === null ? null : Math.round(maxMs),
+
+        // Middle observed measurement after sorting.
+        medianMs: medianMs === null ? null : Math.round(medianMs),
+
+        // Spread between highest and lowest.
+        jitterMs: jitterMs === null ? null : Math.round(jitterMs),
+
+        // Preferred score: lower is better.
+        // This favors probes that are both fast and stable.
+        scoreMs: scoreMs === null ? null : Math.round(scoreMs),
+
+        samplesMs: values.map(v => Math.round(v)),
+        failedSamples: errors.length,
+        errors
+      };
+    }
+
+    function estimateByWeightedCentroid(results, latencyField = "scoreMs") {
+      const usable = results
+        .filter(r => r.ok && Number.isFinite(r[latencyField]))
+        .sort((a, b) => a[latencyField] - b[latencyField]);
+
+      if (usable.length < 3) {
+        return {
+          ok: false,
+          basedOn: latencyField,
+          reason: "Need at least 3 successful probe measurements."
+        };
+      }
+
+      const closest = usable.slice(0, CLOSEST_PROBES_TO_USE);
+
+      let sumWeight = 0;
+      let sumLat = 0;
+      let sumLon = 0;
+
+      for (const r of closest) {
+        const latency = r[latencyField];
+
+        // Lower latency/score = higher weight.
+        // Squared denominator makes the best probes dominate more strongly.
+        const weight = 1 / Math.max(1, latency * latency);
+
+        sumWeight += weight;
+        sumLat += r.lat * weight;
+        sumLon += r.lon * weight;
+      }
+
+      const best = usable[0];
+      const second = usable[1];
+
+      const lat = +(sumLat / sumWeight).toFixed(4);
+      const lon = +(sumLon / sumWeight).toFixed(4);
+
+      return {
+        ok: true,
+        basedOn: latencyField,
+        warning: "This is network-proximity estimation, not real geolocation.",
+        approximateLocation: `${lat}, ${lon}`,
+        approximateLat: lat,
+        approximateLon: lon,
+        nearestRegion: best.region,
+        nearestContinent: best.continent,
+        nearestProbe: best.id,
+        confidence:
+          second && second[latencyField] - best[latencyField] > 35
+            ? "medium"
+            : "low",
+        closestUsed: closest.map(r => ({
+          id: r.id,
+          region: r.region,
+          continent: r.continent,
+          minMs: r.minMs,
+          maxMs: r.maxMs,
+          medianMs: r.medianMs,
+          jitterMs: r.jitterMs,
+          scoreMs: r.scoreMs
+        }))
+      };
+    }
+
+    function summarizeResults(results) {
+      const successful = results.filter(r => r.ok).length;
+      const failed = results.length - successful;
+
+      const sortedByScore = [...results].sort((a, b) => {
+        const aa = Number.isFinite(a.scoreMs) ? a.scoreMs : Infinity;
+        const bb = Number.isFinite(b.scoreMs) ? b.scoreMs : Infinity;
+        return aa - bb;
+      });
+
+      const sortedByMin = [...results].sort((a, b) => {
+        const aa = Number.isFinite(a.minMs) ? a.minMs : Infinity;
+        const bb = Number.isFinite(b.minMs) ? b.minMs : Infinity;
+        return aa - bb;
+      });
+
+      return {
+        totalProbes: results.length,
+        successfulProbes: successful,
+        failedProbes: failed,
+
+        bestByPreferredScore: sortedByScore[0]?.ok
+          ? {
+              id: sortedByScore[0].id,
+              region: sortedByScore[0].region,
+              continent: sortedByScore[0].continent,
+              minMs: sortedByScore[0].minMs,
+              maxMs: sortedByScore[0].maxMs,
+              medianMs: sortedByScore[0].medianMs,
+              jitterMs: sortedByScore[0].jitterMs,
+              scoreMs: sortedByScore[0].scoreMs
+            }
+          : null,
+
+        fastestByLowestMeasurement: sortedByMin[0]?.ok
+          ? {
+              id: sortedByMin[0].id,
+              region: sortedByMin[0].region,
+              continent: sortedByMin[0].continent,
+              minMs: sortedByMin[0].minMs,
+              maxMs: sortedByMin[0].maxMs,
+              medianMs: sortedByMin[0].medianMs,
+              jitterMs: sortedByMin[0].jitterMs,
+              scoreMs: sortedByMin[0].scoreMs
+            }
+          : null,
+
+        noisiestSuccessfulProbes: [...results]
+          .filter(r => r.ok && Number.isFinite(r.jitterMs))
+          .sort((a, b) => b.jitterMs - a.jitterMs)
+          .slice(0, 5)
+          .map(r => ({
+            id: r.id,
+            region: r.region,
+            minMs: r.minMs,
+            maxMs: r.maxMs,
+            medianMs: r.medianMs,
+            jitterMs: r.jitterMs,
+            scoreMs: r.scoreMs
+          }))
+      };
+    }
+
+    runButton.onclick = async () => {
+      runButton.disabled = true;
+      out.textContent = "Measuring all probe locations in parallel...";
+
+      try {
+        // Run all probe locations in parallel.
+        const results = await Promise.all(
+          probes.map(probe => measureProbe(probe, SAMPLE_COUNT))
+        );
+
+        const sortedResults = results.sort((a, b) => {
+          const aa = Number.isFinite(a.scoreMs) ? a.scoreMs : Infinity;
+          const bb = Number.isFinite(b.scoreMs) ? b.scoreMs : Infinity;
+          return aa - bb;
+        });
+
+        const fromLowest = estimateByWeightedCentroid(sortedResults, "minMs");
+        const fromHighest = estimateByWeightedCentroid(sortedResults, "maxMs");
+        const fromMedian = estimateByWeightedCentroid(sortedResults, "medianMs");
+        const fromScore = estimateByWeightedCentroid(sortedResults, "scoreMs");
+
+        out.textContent = JSON.stringify({
+          estimate: {
+            approximateLocation: fromScore.ok ? fromScore.approximateLocation : null,
+            preferredBasis: "scoreMs = minMs + jitterMs*0.1",
+            preferred: fromScore,
+
+            comparison: {
+              fromLowestMeasurements: fromLowest,
+              fromHighestMeasurements: fromHighest,
+              fromMedianMeasurements: fromMedian,
+              fromPreferredScore: fromScore
+            }
+          },
+          summary: summarizeResults(sortedResults),
+          results: sortedResults
+        }, null, 2);
+      } catch (err) {
+        out.textContent = JSON.stringify({
+          ok: false,
+          error: err.message || String(err)
+        }, null, 2);
+      } finally {
+        runButton.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
