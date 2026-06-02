@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+<body>
+  <button id="run">Run latency location POC</button>
+  <pre id="out"></pre>
+
+  <script>
+    const probes = [
+      { id: "na-us-east-linode", continent: "North America", region: "Newark / New York", lat: 40.7357, lon: -74.1724, url: "https://speedgauge2.optonline.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "na-us-west-vultr", continent: "North America", region: "Los Angeles", lat: 34.0522, lon: -118.2437, url: "https://la-ookla.geolinks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "eu-vilnius-cgates", continent: "Europe", region: "Vilnius", lat: 54.67378660032983, lon: 25.261155515136494, url: "https://speedtest-3.cgates.lt:8080/hello?nocache" },
+      { id: "eu-kaunas-cgates", continent: "Europe", region: "Kaunas", lat: 54.9138, lon: 23.9333, url: "https://speedtest-2.cgates.lt:8080/hello?nocache" },
+      { id: "eu-moscow-firststep", continent: "Europe", region: "Moscow", lat: 55.76258655550245, lon: 37.590838795098115, url: "https://ookla-speedtest.fsr.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-rome-fastweb", continent: "Europe", region: "Rome", lat: 41.92083789780521, lon: 12.490936898306725, url: "https://spd-pub-rm-01-01.fastwebnet.it:8080/hello?nocache" },
+      { id: "eu-frankfurt-linode", continent: "Europe", region: "Frankfurt", lat: 50.1109, lon: 8.6821, url: "https://speedtest.58243.as.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-london-linode", continent: "Europe", region: "London", lat: 51.5072, lon: -0.1276, url: "https://ab-thn-ookla01.air-band.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-oslo-telenor", continent: "Europe", region: "Oslo", lat: 59.913664908492876, lon: 10.750856571682311, url: "https://test.telenor.net:8080/hello?nocache" },
+      { id: "eu-krakow-wnet", continent: "Europe", region: "Krakow", lat: 50.0719615813893, lon: 19.989332246891628, url: "https://speedtest.w-net.eu.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-klaipeda-telia", continent: "Europe", region: "Klaipeda", lat: 55.71231910488327, lon: 21.13277197030626, url: "https://speed-klaipeda.telia.lt:8080/hello?nocache" },
+      { id: "eu-riga-tet", continent: "Europe", region: "Riga", lat: 57.0114, lon: 24.1207, url: "https://mini1.speedtest.lv.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "Istanbul", continent: "Europe", region: "London", lat: 41.05353505992091, lon: 29.06566534729723, url: "https://speedtest.turk.net:8080/hello?nocache" },
+
+      { id: "asia-singapore-linode", continent: "Asia", region: "Singapore", lat: 1.3521, lon: 103.8198, url: "https://speedtest2.pacificinternet.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "asia-tokyo-linode", continent: "Asia", region: "Tokyo", lat: 35.6762, lon: 139.6503, url: "https://ty8.speedtest.gslnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "oceania-sydney-linode", continent: "Oceania", region: "Sydney", lat: -33.8688, lon: 151.2093, url: "https://syd1.speedtest.telstra.net:8080/hello?nocache" },
+
+      { id: "sa-sao-paulo-vultr", continent: "South America", region: "São Paulo", lat: -23.5558, lon: -46.6396, url: "https://speedtest.choconet.com.br.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      // If this one fails, remove it. Some Vultr regional ping hostnames change over time.
+      { id: "af-johannesburg-vultr", continent: "Africa", region: "Johannesburg", lat: -26.2041, lon: 28.0473, url: "https://speed.korisp.com:8080/hello?nocache" }
+    ];
+
+    const out = document.getElementById("out");
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function timeRequest(url, timeoutMs = 3500) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const start = performance.now();
+
+      try {
+        await fetch(url + "?cacheBust=" + crypto.randomUUID(), {
+          method: "GET",
+          mode: "no-cors",
+          cache: "no-store",
+          credentials: "omit",
+          signal: controller.signal
+        });
+
+        return {
+          ok: true,
+          ms: performance.now() - start
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          ms: null,
+          error: err.name || String(err)
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function measureProbe(probe, samples = 5) {
+      const values = [];
+      const errors = [];
+
+      // Warm-up request. TLS/DNS setup can distort the first sample.
+      await timeRequest(probe.url);
+      await sleep(100);
+
+      for (let i = 0; i < samples; i++) {
+        const result = await timeRequest(probe.url);
+
+        if (result.ok && Number.isFinite(result.ms)) {
+          values.push(result.ms);
+        } else {
+          errors.push(result.error || "failed");
+        }
+
+        await sleep(120);
+      }
+
+      values.sort((a, b) => a - b);
+
+      return {
+        ...probe,
+        ok: values.length > 0,
+        minMs: values.length ? Math.round(values[0]) : null,
+        medianMs: values.length ? Math.round(values[Math.floor(values.length / 2)]) : null,
+        samplesMs: values.map(v => Math.round(v)),
+        errors
+      };
+    }
+
+    function estimateByWeightedCentroid(results) {
+      const usable = results
+        .filter(r => r.ok && Number.isFinite(r.minMs))
+        .sort((a, b) => a.minMs - b.minMs);
+
+      if (usable.length < 3) {
+        return {
+          ok: false,
+          reason: "Need at least 3 successful probe measurements."
+        };
+      }
+
+      // Use the closest 4 probes only. Far probes add noise.
+      const closest = usable.slice(0, 4);
+
+      let sumWeight = 0;
+      let sumLat = 0;
+      let sumLon = 0;
+
+      for (const r of closest) {
+        // Lower latency = higher weight.
+        // Squaring makes the closest nodes dominate more strongly.
+        const weight = 1 / Math.max(1, r.minMs * r.minMs);
+
+        sumWeight += weight;
+        sumLat += r.lat * weight;
+        sumLon += r.lon * weight;
+      }
+
+      const best = usable[0];
+      const second = usable[1];
+
+      const lat = +(sumLat / sumWeight).toFixed(4);
+const lon = +(sumLon / sumWeight).toFixed(4);
+
+      return {
+        ok: true,
+        warning: "This is network-proximity estimation, not real geolocation.",
+        approximateLocation: `${lat}, ${lon}`,
+        approximateLat: +(sumLat / sumWeight).toFixed(4),
+        approximateLon: +(sumLon / sumWeight).toFixed(4),
+        nearestRegion: best.region,
+        nearestContinent: best.continent,
+        confidence:
+          second && second.minMs - best.minMs > 35
+            ? "medium"
+            : "low",
+        closestUsed: closest.map(r => ({
+          id: r.id,
+          region: r.region,
+          continent: r.continent,
+          minMs: r.minMs
+        }))
+      };
+    }
+
+    document.getElementById("run").onclick = async () => {
+      out.textContent = "Measuring...";
+
+      const results = [];
+
+      for (const probe of probes) {
+        const result = await measureProbe(probe);
+        results.push(result);
+
+        out.textContent = JSON.stringify({
+          estimate: estimateByWeightedCentroid(results),
+          results
+        }, null, 2);
+      }
+    };
+  </script>
+</body>
+</html>

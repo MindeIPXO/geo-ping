@@ -1,0 +1,529 @@
+<!doctype html>
+<html>
+<body>
+  <button id="run">Run latency location POC</button>
+  <pre id="out"></pre>
+
+  <script>
+    const probes = [
+		// Albania
+		{ id: "al-tirana-abcom", country: "Albania", continent: "Europe", region: "Tirana", lat: 41.3275, lon: 19.8189, url: "https://speedtest.vodafone.al:8080/hello?nocache" },
+
+		// // Andorra
+		// { id: "ad-andorra-la-vella-andorra-telecom", country: "Andorra", continent: "Europe", region: "Andorra la Vella", lat: 42.5063, lon: 1.5218, url: "https://ooklaspeedtest1.andorratelecom.ad:8080/hello?nocache" },
+
+		// // Armenia
+		// { id: "am-yerevan-ucom", country: "Armenia", continent: "Europe/Asia", region: "Yerevan", lat: 40.1872, lon: 44.5152, url: "https://sp1.ucom.am:8080/hello?nocache" },
+
+		// // Austria
+		// { id: "at-vienna-a1", country: "Austria", continent: "Europe", region: "Vienna", lat: 48.2082, lon: 16.3738, url: "https://ookla01-1.highway.telekom.at:8080/hello?nocache" },
+
+		// // Azerbaijan
+		// { id: "az-baku-azertelecom", country: "Azerbaijan", continent: "Europe/Asia", region: "Baku", lat: 40.4093, lon: 49.8671, url: "https://speed.azertelecom.az:8080/hello?nocache" },
+
+		// // Belarus
+		// { id: "by-minsk-beltelecom", country: "Belarus", continent: "Europe", region: "Minsk", lat: 53.9006, lon: 27.5590, url: "https://speedtest.minsktelecom.by:8080/hello?nocache" },
+
+		// // Belgium
+		// { id: "be-brussels-proximus", country: "Belgium", continent: "Europe", region: "Brussels", lat: 50.8503, lon: 4.3517, url: "https://speedtest001.proximus.be:8080/hello?nocache" },
+
+		// // Bosnia and Herzegovina
+		// { id: "ba-sarajevo-bhtelecom", country: "Bosnia and Herzegovina", continent: "Europe", region: "Sarajevo", lat: 43.8563, lon: 18.4131, url: "https://speedtest.bih.net.ba:8080/hello?nocache" },
+
+		// // Bulgaria
+		// { id: "bg-sofia-neterra", country: "Bulgaria", continent: "Europe", region: "Sofia", lat: 42.6977, lon: 23.3219, url: "https://sp1.neterra.net:8080/hello?nocache" },
+
+		// // Croatia
+		// { id: "hr-zagreb-ht", country: "Croatia", continent: "Europe", region: "Zagreb", lat: 45.8150, lon: 15.9819, url: "https://speedtest.ht.hr:8080/hello?nocache" },
+
+		// // Cyprus
+		// { id: "cy-nicosia-cyta", country: "Cyprus", continent: "Europe", region: "Nicosia", lat: 35.1856, lon: 33.3823, url: "https://speedtest.cytanet.com.cy:8080/hello?nocache" },
+
+		// // Czechia
+		// { id: "cz-brno-netbox", country: "Czechia", continent: "Europe", region: "Brno", lat: 49.1951, lon: 16.6068, url: "https://ookla.netbox.cz:8080/hello?nocache" },
+
+		// // Denmark
+		// { id: "dk-copenhagen-tdc", country: "Denmark", continent: "Europe", region: "Copenhagen", lat: 55.6761, lon: 12.5683, url: "https://linespeed.nms.tele.dk:8080/hello?nocache" },
+
+		// Estonia
+		{ id: "ee-tallinn-telia", country: "Estonia", continent: "Europe", region: "Tallinn", lat: 59.4370, lon: 24.7536, url: "https://kiirustest.telia.ee:8080/hello?nocache" },
+
+		// // Finland
+		// { id: "fi-helsinki-elisa", country: "Finland", continent: "Europe", region: "Helsinki", lat: 60.1699, lon: 24.9384, url: "https://speedtest1.saunalahti.fi:8080/hello?nocache" },
+
+		// // France
+		// { id: "fr-lyon-orange", country: "France", continent: "Europe", region: "Lyon", lat: 45.7640, lon: 4.8357, url: "https://lyon.speedtest.orange.fr:8080/hello?nocache" },
+
+		// // Georgia
+		// { id: "ge-tbilisi-silknet", country: "Georgia", continent: "Europe/Asia", region: "Tbilisi", lat: 41.7151, lon: 44.8271, url: "https://speed.silknet.com:8080/hello?nocache" },
+
+		// // Germany
+		// { id: "de-frankfurt-vodafone", country: "Germany", continent: "Europe", region: "Frankfurt", lat: 50.1109, lon: 8.6821, url: "https://speedtest.vodafone-ip.de:8080/hello?nocache" },
+
+		// // Greece
+		// { id: "gr-athens-grix", country: "Greece", continent: "Europe", region: "Athens", lat: 37.9838, lon: 23.7275, url: "https://speedtest.gr-ix.gr:8080/hello?nocache" },
+
+		// // Hungary
+		// { id: "hu-budapest-telekom", country: "Hungary", continent: "Europe", region: "Budapest", lat: 47.4979, lon: 19.0402, url: "https://speedtest.telekom.hu:8080/hello?nocache" },
+
+		// // Iceland
+		// { id: "is-reykjavik-siminn", country: "Iceland", continent: "Europe", region: "Reykjavik", lat: 64.1466, lon: -21.9426, url: "https://speedtest.siminn.is:8080/hello?nocache" },
+
+		// // Ireland
+		// { id: "ie-dublin-eir", country: "Ireland", continent: "Europe", region: "Dublin", lat: 53.3498, lon: -6.2603, url: "https://speedtest00.eircom.net:8080/hello?nocache" },
+
+		// // Italy
+		// { id: "it-rome-unidata", country: "Italy", continent: "Europe", region: "Rome", lat: 41.9028, lon: 12.4964, url: "https://speedtest.unidata.it:8080/hello?nocache" },
+
+		// // Kosovo
+		// // Note: public lists sometimes classify Prishtina inconsistently.
+		// { id: "xk-prishtina-artmotion", country: "Kosovo", continent: "Europe", region: "Prishtina", lat: 42.6629, lon: 21.1655, url: "https://speedtest.artmotion.net:8080/hello?nocache" },
+
+		// // Latvia
+		// { id: "lv-riga-lattelecom", country: "Latvia", continent: "Europe", region: "Riga", lat: 56.9496, lon: 24.1052, url: "https://mini1.speedtest.lv:8080/hello?nocache" },
+
+		// // Liechtenstein
+		// { id: "li-vaduz-fl1", country: "Liechtenstein", continent: "Europe", region: "Vaduz", lat: 47.1410, lon: 9.5209, url: "https://speedtest.fl1.li:8080/hello?nocache" },
+
+		// // Lithuania
+		// { id: "lt-vilnius-cgates", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6872, lon: 25.2797, url: "https://speedtest-01.cgates.lt:8080/hello?nocache" },
+		// { id: "lt-kaunas-litnet", country: "Lithuania", continent: "Europe", region: "Kaunas", lat: 54.8985, lon: 23.9036, url: "https://speedtest.litnet.lt:8080/hello?nocache" },
+		// { id: "lt-siauliai-bacloud", country: "Lithuania", continent: "Europe", region: "Siauliai", lat: 55.9349, lon: 23.3137, url: "https://speedtest.bacloud.com:8080/hello?nocache" },
+
+		// // Luxembourg
+		// { id: "lu-luxembourg-post", country: "Luxembourg", continent: "Europe", region: "Luxembourg", lat: 49.6116, lon: 6.1319, url: "https://www.speedtest.lu:8080/hello?nocache" },
+
+		// // Malta
+		// { id: "mt-marsa-go", country: "Malta", continent: "Europe", region: "Marsa", lat: 35.8792, lon: 14.4953, url: "https://speedtest.go.com.mt:8080/hello?nocache" },
+
+		// // Moldova
+		{ id: "md-chisinau-orange", country: "Moldova", continent: "Europe", region: "Chisinau", lat: 47.0105, lon: 28.8638, url: "https://speedtest.orange.md.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+		// // Monaco
+		// { id: "mc-monaco-telecom", country: "Monaco", continent: "Europe", region: "Monaco", lat: 43.7384, lon: 7.4246, url: "https://speedtest.monaco-telecom.mc:8080/hello?nocache" },
+
+		// // Montenegro
+		// { id: "me-podgorica-telekom", country: "Montenegro", continent: "Europe", region: "Podgorica", lat: 42.4304, lon: 19.2594, url: "https://speedtest.t-com.me:8080/hello?nocache" },
+
+		// // Netherlands
+		// { id: "nl-amsterdam-xs4all", country: "Netherlands", continent: "Europe", region: "Amsterdam", lat: 52.3676, lon: 4.9041, url: "https://speedtest.xs4all.nl:8080/hello?nocache" },
+
+		// // North Macedonia
+		// { id: "mk-skopje-telekom", country: "North Macedonia", continent: "Europe", region: "Skopje", lat: 41.9981, lon: 21.4254, url: "https://speedtestmkt.t.mk:8080/hello?nocache" },
+
+		// // Norway
+		// { id: "no-oslo-telenor", country: "Norway", continent: "Europe", region: "Oslo", lat: 59.9139, lon: 10.7522, url: "https://test.telenor.net:8080/hello?nocache" },
+
+		// // Poland
+		// { id: "pl-warsaw-orange", country: "Poland", continent: "Europe", region: "Warsaw", lat: 52.2297, lon: 21.0122, url: "https://war-o1.speedtest.orange.pl:8080/hello?nocache" },
+		// { id: "pl-lodz-orange", country: "Poland", continent: "Europe", region: "Lodz", lat: 51.7592, lon: 19.4560, url: "https://lod-o1.speedtest.orange.pl:8080/hello?nocache" },
+		// { id: "pl-krakow-wnet", country: "Poland", continent: "Europe", region: "Krakow", lat: 50.0647, lon: 19.9450, url: "https://speedtest.w-net.eu:8080/hello?nocache" },
+
+		// // Portugal
+		// { id: "pt-lisbon-vodafone", country: "Portugal", continent: "Europe", region: "Lisbon", lat: 38.7223, lon: -9.1393, url: "https://speedtest-lx.vodafone.pt:8080/hello?nocache" },
+
+		// // Romania
+		{ id: "ro-bucharest-rcs-rds", country: "Romania", continent: "Europe", region: "Bucharest", lat: 44.4268, lon: 26.1025, url: "https://speedtestbucuresti.vodafone.ro:8080/hello?nocache" },
+		// { id: "ro-iasi-rcs-rds", country: "Romania", continent: "Europe", region: "Iasi", lat: 47.1585, lon: 27.6014, url: "https://speedtest1.is.rcs-rds.ro:8080/hello?nocache" },
+
+		// // Serbia
+		// { id: "rs-belgrade-telekom", country: "Serbia", continent: "Europe", region: "Belgrade", lat: 44.8125, lon: 20.4612, url: "https://speedtest-net.isp.telekom.rs:8080/hello?nocache" },
+
+		// // Slovakia
+		// { id: "sk-bratislava-swan", country: "Slovakia", continent: "Europe", region: "Bratislava", lat: 48.1486, lon: 17.1077, url: "https://speedmeter.swan.sk:8080/hello?nocache" },
+		// { id: "sk-banska-bystrica-bbx", country: "Slovakia", continent: "Europe", region: "Banska Bystrica", lat: 48.7363, lon: 19.1462, url: "https://speedtest.bbxnet.sk:8080/hello?nocache" },
+
+		// // Slovenia
+		// { id: "si-ljubljana-telekom", country: "Slovenia", continent: "Europe", region: "Ljubljana", lat: 46.0569, lon: 14.5058, url: "https://speedtest1.telekom.si:8080/hello?nocache" },
+
+		// // Spain
+		// { id: "es-madrid-vodafone", country: "Spain", continent: "Europe", region: "Madrid", lat: 40.4168, lon: -3.7038, url: "https://speedtest.vodafone.es:8080/hello?nocache" },
+
+		// // Sweden
+		// { id: "se-stockholm-nordunet", country: "Sweden", continent: "Europe", region: "Stockholm", lat: 59.3293, lon: 18.0686, url: "https://speedtest.nordu.net:8080/hello?nocache" },
+
+		// // Switzerland
+		// { id: "ch-zurich-iway", country: "Switzerland", continent: "Europe", region: "Zurich", lat: 47.3769, lon: 8.5417, url: "https://speedtest.iway.ch:8080/hello?nocache" },
+
+		// // Turkey
+		// { id: "tr-ankara-turkcell", country: "Turkey", continent: "Europe/Asia", region: "Ankara", lat: 39.9334, lon: 32.8597, url: "https://sgtz01.hizinitestet.com:8080/hello?nocache" },
+		// { id: "tr-istanbul-turknet", country: "Turkey", continent: "Europe/Asia", region: "Istanbul", lat: 41.0082, lon: 28.9784, url: "https://speedtest.turk.net:8080/hello?nocache" },
+
+		// // Ukraine
+		{ id: "ua-kyiv-kyivstar", country: "Ukraine", continent: "Europe", region: "Kyiv", lat: 50.4501, lon: 30.5234, url: "https://speedtest.vselink.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+		{ id: "ua-lviv-uarnet", country: "Ukraine", continent: "Europe", region: "Lviv", lat: 49.8397, lon: 24.0297, url: "https://ookla.lc.lviv.ua.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+		// // United Kingdom
+		// { id: "gb-london-community-fibre", country: "United Kingdom", continent: "Europe", region: "London", lat: 51.5072, lon: -0.1276, url: "https://speedtest01.communityfibre.co.uk:8080/hello?nocache" },
+		// { id: "gb-manchester-m247", country: "United Kingdom", continent: "Europe", region: "Manchester", lat: 53.4808, lon: -2.2426, url: "https://ookla1.man4.uk.m247.com:8080/hello?nocache" },
+
+
+	/////////////////////////
+      { id: "na-us-east-linode", continent: "North America", region: "Newark / New York", lat: 40.7357, lon: -74.1724, url: "https://speedgauge2.optonline.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "na-us-west-vultr", continent: "North America", region: "Los Angeles", lat: 34.0522, lon: -118.2437, url: "https://la-ookla.geolinks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+    //   { id: "eu-vilnius-cgates", continent: "Europe", region: "Vilnius", lat: 54.67378660032983, lon: 25.261155515136494, url: "https://speedtest-3.cgates.lt:8080/hello?nocache" },
+      { id: "eu-vilnius-telia", continent: "Europe", region: "Vilnius", lat: 54.67378660032983, lon: 25.261155515136494, url: "https://speed-vilnius.telia.lt:8080/hello?nocache" },
+      { id: "eu-kaunas-cgates", continent: "Europe", region: "Kaunas", lat: 54.9138, lon: 23.9333, url: "https://speedtest-2.cgates.lt:8080/hello?nocache" },
+      { id: "eu-panevezys-cgates", continent: "Europe", region: "Panevezys", lat: 55.7298132959683, lon: 24.370113139905147, url: "https://speedtest-1.cgates.lt:8080/hello?nocache" },
+      { id: "eu-moscow-firststep", continent: "Europe", region: "Moscow", lat: 55.76258655550245, lon: 37.590838795098115, url: "https://ookla-speedtest.fsr.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-rome-fastweb", continent: "Europe", region: "Rome", lat: 41.92083789780521, lon: 12.490936898306725, url: "https://spd-pub-rm-01-01.fastwebnet.it:8080/hello?nocache" },
+      { id: "eu-frankfurt-linode", continent: "Europe", region: "Frankfurt", lat: 50.1109, lon: 8.6821, url: "https://speedtest.58243.as.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-london-linode", continent: "Europe", region: "London", lat: 51.5072, lon: -0.1276, url: "https://ab-thn-ookla01.air-band.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-oslo-telenor", continent: "Europe", region: "Oslo", lat: 59.913664908492876, lon: 10.750856571682311, url: "https://test.telenor.net:8080/hello?nocache" },
+      { id: "eu-krakow-wnet", continent: "Europe", region: "Krakow", lat: 50.0719615813893, lon: 19.989332246891628, url: "https://speedtest.w-net.eu.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-klaipeda-telia", continent: "Europe", region: "Klaipeda", lat: 55.71231910488327, lon: 21.13277197030626, url: "https://speed-klaipeda.telia.lt:8080/hello?nocache" },
+      { id: "eu-riga-tet", continent: "Europe", region: "Riga", lat: 57.0114, lon: 24.1207, url: "https://mini1.speedtest.lv.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-minsk-datahata", continent: "Europe", region: "Minsk", lat: 53.9045, lon: 27.5591, url: "https://speedtest.datahata.by.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "eu-gtrodno-datahata", continent: "Europe", region: "Grodno", lat: 53.6696, lon: 23.8315, url: "https://speedtest.grodno.by:8080/hello?nocache" },
+
+      { id: "istanbul-turknet", continent: "Europe", region: "Istanbul", lat: 41.05353505992091, lon: 29.06566534729723, url: "https://speedtest.turk.net:8080/hello?nocache" },
+
+      { id: "asia-singapore-linode", continent: "Asia", region: "Singapore", lat: 1.3521, lon: 103.8198, url: "https://speedtest2.pacificinternet.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      { id: "asia-tokyo-linode", continent: "Asia", region: "Tokyo", lat: 35.6762, lon: 139.6503, url: "https://ty8.speedtest.gslnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "oceania-sydney-linode", continent: "Oceania", region: "Sydney", lat: -33.8688, lon: 151.2093, url: "https://syd1.speedtest.telstra.net:8080/hello?nocache" },
+
+      { id: "sa-sao-paulo-vultr", continent: "South America", region: "São Paulo", lat: -23.5558, lon: -46.6396, url: "https://speedtest.choconet.com.br.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+
+      { id: "af-johannesburg-vultr", continent: "Africa", region: "Johannesburg", lat: -26.2041, lon: 28.0473, url: "https://speed.korisp.com:8080/hello?nocache" }
+
+    ];
+
+    const out = document.getElementById("out");
+    const runButton = document.getElementById("run");
+
+    const SAMPLE_COUNT = 5;
+    const TIMEOUT_MS = 3500;
+
+    // Number of probe locations measured at the same time.
+    // Keep this moderate to avoid measuring browser queueing instead of network latency.
+    const PROBE_CONCURRENCY = 18;
+
+    // Number of closest/best probes used for centroid estimate.
+    const CLOSEST_PROBES_TO_USE = 4;
+
+	const JITTER_WEIGHT = 0.05;
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function appendCacheBust(url) {
+      const separator = url.includes("?") ? "&" : "?";
+      return url + separator + "cacheBust=" + crypto.randomUUID();
+    }
+
+    async function timeRequest(url, timeoutMs = TIMEOUT_MS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const start = performance.now();
+
+      try {
+        await fetch(appendCacheBust(url), {
+          method: "GET",
+          mode: "no-cors",
+          cache: "no-store",
+          credentials: "omit",
+          signal: controller.signal
+        });
+
+        return {
+          ok: true,
+          ms: performance.now() - start
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          ms: null,
+          error: err.name || String(err)
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function measureProbe(probe, samples = SAMPLE_COUNT) {
+      const values = [];
+      const errors = [];
+
+      // Warm-up request. This can absorb DNS/TCP/TLS setup noise.
+      // It is intentionally not included in the measured samples.
+      await timeRequest(probe.url);
+      await sleep(80);
+
+      // Samples are sequential per probe to avoid the samples competing with each other.
+      for (let i = 0; i < samples; i++) {
+        const result = await timeRequest(probe.url);
+
+        if (result.ok && Number.isFinite(result.ms)) {
+          values.push(result.ms);
+        } else {
+          errors.push(result.error || "failed");
+        }
+
+        await sleep(120);
+      }
+
+      values.sort((a, b) => a - b);
+
+      const minMs = values.length ? values[0] : null;
+      const maxMs = values.length ? values[values.length - 1] : null;
+      const medianMs = values.length ? values[Math.floor(values.length / 2)] : null;
+      const jitterMs = minMs === null || maxMs === null ? null : maxMs - minMs;
+      const scoreMs = medianMs === null || jitterMs === null ? null : minMs + jitterMs * JITTER_WEIGHT;
+
+      return {
+        ...probe,
+        ok: values.length > 0,
+
+        minMs: minMs === null ? null : Math.round(minMs),
+        maxMs: maxMs === null ? null : Math.round(maxMs),
+        medianMs: medianMs === null ? null : Math.round(medianMs),
+        jitterMs: jitterMs === null ? null : Math.round(jitterMs),
+
+        // Preferred score: lower is better.
+        // This favors probes that are both fast and stable.
+        scoreMs: scoreMs === null ? null : Math.round(scoreMs),
+
+        samplesMs: values.map(v => Math.round(v)),
+        failedSamples: errors.length,
+        errors
+      };
+    }
+
+    async function mapWithConcurrency(items, concurrency, mapper, onProgress) {
+      const results = new Array(items.length);
+      let nextIndex = 0;
+      let completed = 0;
+
+      async function worker() {
+        while (nextIndex < items.length) {
+          const currentIndex = nextIndex++;
+          const item = items[currentIndex];
+
+          try {
+            results[currentIndex] = await mapper(item, currentIndex);
+          } catch (err) {
+            results[currentIndex] = {
+              ...item,
+              ok: false,
+              error: err.message || String(err)
+            };
+          }
+
+          completed++;
+
+          if (typeof onProgress === "function") {
+            onProgress({
+              completed,
+              total: items.length,
+              latest: results[currentIndex],
+              resultsSoFar: results.filter(Boolean)
+            });
+          }
+        }
+      }
+
+      const workerCount = Math.min(concurrency, items.length);
+
+      await Promise.all(
+        Array.from({ length: workerCount }, () => worker())
+      );
+
+      return results;
+    }
+
+    function estimateByWeightedCentroid(results, latencyField = "scoreMs") {
+      const usable = results
+        .filter(r => r.ok && Number.isFinite(r[latencyField]))
+        .sort((a, b) => a[latencyField] - b[latencyField]);
+
+      if (usable.length < 3) {
+        return {
+          ok: false,
+          basedOn: latencyField,
+          reason: "Need at least 3 successful probe measurements."
+        };
+      }
+
+      const closest = usable.slice(0, CLOSEST_PROBES_TO_USE);
+
+      let sumWeight = 0;
+      let sumLat = 0;
+      let sumLon = 0;
+
+      for (const r of closest) {
+        const latency = r[latencyField];
+
+        // Lower latency/score = higher weight.
+        // const weight = 1 / Math.max(1, latency * latency);
+		const weight = 1 / Math.max(1, latency ** 4);
+
+        sumWeight += weight;
+        sumLat += r.lat * weight;
+        sumLon += r.lon * weight;
+      }
+
+      const best = usable[0];
+      const second = usable[1];
+
+      const lat = +(sumLat / sumWeight).toFixed(4);
+      const lon = +(sumLon / sumWeight).toFixed(4);
+
+      return {
+        ok: true,
+        basedOn: latencyField,
+        warning: "This is network-proximity estimation, not real geolocation.",
+        approximateLocation: `${lat}, ${lon}`,
+        approximateLat: lat,
+        approximateLon: lon,
+        nearestRegion: best.region,
+        nearestContinent: best.continent,
+        nearestProbe: best.id,
+        confidence:
+          second && second[latencyField] - best[latencyField] > 35
+            ? "medium"
+            : "low",
+        closestUsed: closest.map(r => ({
+          id: r.id,
+          country: r.country,
+          region: r.region,
+          continent: r.continent,
+          minMs: r.minMs,
+          maxMs: r.maxMs,
+          medianMs: r.medianMs,
+          jitterMs: r.jitterMs,
+          scoreMs: r.scoreMs
+        }))
+      };
+    }
+
+    function summarizeResults(results) {
+      const successful = results.filter(r => r.ok).length;
+      const failed = results.length - successful;
+
+      const sortedByScore = [...results].sort((a, b) => {
+        const aa = Number.isFinite(a.scoreMs) ? a.scoreMs : Infinity;
+        const bb = Number.isFinite(b.scoreMs) ? b.scoreMs : Infinity;
+        return aa - bb;
+      });
+
+      const sortedByMin = [...results].sort((a, b) => {
+        const aa = Number.isFinite(a.minMs) ? a.minMs : Infinity;
+        const bb = Number.isFinite(b.minMs) ? b.minMs : Infinity;
+        return aa - bb;
+      });
+
+      return {
+        totalProbes: results.length,
+        successfulProbes: successful,
+        failedProbes: failed,
+
+        bestByPreferredScore: sortedByScore[0]?.ok
+          ? {
+              id: sortedByScore[0].id,
+              country: sortedByScore[0].country,
+              region: sortedByScore[0].region,
+              continent: sortedByScore[0].continent,
+              minMs: sortedByScore[0].minMs,
+              maxMs: sortedByScore[0].maxMs,
+              medianMs: sortedByScore[0].medianMs,
+              jitterMs: sortedByScore[0].jitterMs,
+              scoreMs: sortedByScore[0].scoreMs
+            }
+          : null,
+
+        fastestByLowestMeasurement: sortedByMin[0]?.ok
+          ? {
+              id: sortedByMin[0].id,
+              country: sortedByMin[0].country,
+              region: sortedByMin[0].region,
+              continent: sortedByMin[0].continent,
+              minMs: sortedByMin[0].minMs,
+              maxMs: sortedByMin[0].maxMs,
+              medianMs: sortedByMin[0].medianMs,
+              jitterMs: sortedByMin[0].jitterMs,
+              scoreMs: sortedByMin[0].scoreMs
+            }
+          : null,
+
+        noisiestSuccessfulProbes: [...results]
+          .filter(r => r.ok && Number.isFinite(r.jitterMs))
+          .sort((a, b) => b.jitterMs - a.jitterMs)
+          .slice(0, 5)
+          .map(r => ({
+            id: r.id,
+            country: r.country,
+            region: r.region,
+            minMs: r.minMs,
+            maxMs: r.maxMs,
+            medianMs: r.medianMs,
+            jitterMs: r.jitterMs,
+            scoreMs: r.scoreMs
+          }))
+      };
+    }
+
+    function makeOutput(results) {
+      const sortedResults = [...results].sort((a, b) => {
+        const aa = Number.isFinite(a.scoreMs) ? a.scoreMs : Infinity;
+        const bb = Number.isFinite(b.scoreMs) ? b.scoreMs : Infinity;
+        return aa - bb;
+      });
+
+      const fromLowest = estimateByWeightedCentroid(sortedResults, "minMs");
+      const fromHighest = estimateByWeightedCentroid(sortedResults, "maxMs");
+      const fromMedian = estimateByWeightedCentroid(sortedResults, "medianMs");
+      const fromScore = estimateByWeightedCentroid(sortedResults, "scoreMs");
+
+      return {
+        estimate: {
+          approximateLocation: fromScore.ok ? fromScore.approximateLocation : null,
+          preferredBasis: "scoreMs = minMs + jitterMs",
+          preferred: fromScore,
+
+          comparison: {
+            fromLowestMeasurements: fromLowest,
+            fromHighestMeasurements: fromHighest,
+            fromMedianMeasurements: fromMedian,
+            fromPreferredScore: fromScore
+          }
+        },
+        summary: summarizeResults(sortedResults),
+        results: sortedResults
+      };
+    }
+
+    runButton.onclick = async () => {
+      runButton.disabled = true;
+      out.textContent = "Measuring probe locations with limited concurrency...";
+
+      try {
+        const results = await mapWithConcurrency(
+          probes,
+          PROBE_CONCURRENCY,
+          probe => measureProbe(probe, SAMPLE_COUNT),
+          progress => {
+            out.textContent = JSON.stringify({
+              progress: `${progress.completed}/${progress.total}`,
+              latest: progress.latest,
+              partial: makeOutput(progress.resultsSoFar)
+            }, null, 2);
+          }
+        );
+
+        out.textContent = JSON.stringify(makeOutput(results), null, 2);
+      } catch (err) {
+        out.textContent = JSON.stringify({
+          ok: false,
+          error: err.message || String(err)
+        }, null, 2);
+      } finally {
+        runButton.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
