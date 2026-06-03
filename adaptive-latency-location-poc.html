@@ -26,10 +26,10 @@
   <div class="controls">
     <button id="run">Run adaptive latency location POC</button>
     <label>Probe concurrency <input id="probeConcurrency" type="number" min="1" max="16" value="6" /></label>
-    <label>Samples per probe <input id="sampleCount" type="number" min="1" max="10" value="3" /></label>
-    <label>Neighbor batch <input id="neighborBatchSize" type="number" min="2" max="24" value="8" /></label>
-    <label>Max rounds <input id="maxRounds" type="number" min="1" max="8" value="4" /></label>
-    <label>Confirm top <input id="confirmTopCount" type="number" min="1" max="10" value="5" /></label>
+    <label>Samples per probe <input id="sampleCount" type="number" min="1" max="10" value="5" /></label>
+    <label>Neighbor batch <input id="neighborBatchSize" type="number" min="2" max="24" value="10" /></label>
+    <label>Max rounds <input id="maxRounds" type="number" min="1" max="8" value="5" /></label>
+    <label>Confirm top <input id="confirmTopCount" type="number" min="1" max="10" value="4" /></label>
   </div>
 
   <pre id="out">Ready.</pre>
@@ -64,18 +64,20 @@
 
       // Baltics / nearby region
       { id: "eu-vilnius-telia", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speed-vilnius.telia.lt:8080/hello?nocache" },
-      { id: "eu-vilnius-cgates", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest-3.cgates.lt:8080/hello?nocache" },
-      { id: "eu-vilnius-ntt", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest4.ntt.lt:8080/hello?nocache" },
-      { id: "eu-vilnius-bite", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest.bite.lt.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      // { id: "eu-vilnius-cgates", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest-3.cgates.lt:8080/hello?nocache" },
+      // { id: "eu-vilnius-ntt", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest4.ntt.lt:8080/hello?nocache" },
+      // { id: "eu-vilnius-bite", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest.bite.lt.prod.hosts.ooklaserver.net:8080/hello?nocache" },
       { id: "eu-vilnius-tele2", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://vln038-speedtest-2.tele2.net.prod.hosts.ooklaserver.net:8080/hello?nocache" },
-      { id: "eu-vilnius-init", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest-vno.init.lt:8080/hello?nocache" },
-      { id: "eu-vilnius-penki", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://testspeed.penki.lt:8080/hello?nocache" },
-      { id: "eu-vilnius-hostinger", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://srv1297891.hstgr.cloud.prod.hosts.ooklaserver.net:8080/hello?nocache" },
-      { id: "eu-vilnius-etanetas", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://ookla.etanetas.lt:8080/hello?nocache" },
+      // { id: "eu-vilnius-init", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://speedtest-vno.init.lt:8080/hello?nocache" },
+      // { id: "eu-vilnius-penki", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://testspeed.penki.lt:8080/hello?nocache" },
+      // { id: "eu-vilnius-hostinger", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://srv1297891.hstgr.cloud.prod.hosts.ooklaserver.net:8080/hello?nocache" },
+      // { id: "eu-vilnius-etanetas", country: "Lithuania", continent: "Europe", region: "Vilnius", lat: 54.6833, lon: 25.2833, url: "https://ookla.etanetas.lt:8080/hello?nocache" },
       { id: "lt-siauliai-splius-uab", country: "Lithuania", continent: "Europe", region: "Siauliai", lat: 55.9349, lon: 23.3137, url: "https://speedtest.splius.lt:8080/hello?nocache" },
       { id: "eu-kaunas-cgates", country: "Lithuania", continent: "Europe", region: "Kaunas", lat: 54.9138, lon: 23.9333, url: "https://speedtest-2.cgates.lt:8080/hello?nocache" },
       { id: "eu-panevezys-cgates", country: "Lithuania", continent: "Europe", region: "Panevezys", lat: 55.7348, lon: 24.3575, url: "https://speedtest-1.cgates.lt:8080/hello?nocache" },
       { id: "eu-klaipeda-telia", country: "Lithuania", continent: "Europe", region: "Klaipeda", lat: 55.7033, lon: 21.1443, url: "https://speed-klaipeda.telia.lt:8080/hello?nocache" },
+      { id: "eu-klaipeda-balticum", country: "Lithuania", continent: "Europe", region: "Klaipeda", lat: 55.700, lon: 21.1333, url: "https://stnet1.balticum.lt:8080/hello?nocache" },
+      { id: "eu-kedainiai-speed-mobile", country: "Lithuania", continent: "Europe", region: "Kedainiai", lat: 55.2881, lon: 23.9577, url: "https://speed-mobile.telia.lt:8080/hello?nocache" },
       { id: "lv-riga-as-balticom", country: "Latvia", continent: "Europe", region: "Riga", lat: 56.9496, lon: 24.1040, url: "https://ping.lv:8080/hello?nocache" },
       { id: "eu-riga-tet", country: "Latvia", continent: "Europe", region: "Riga", lat: 56.9496, lon: 24.1040, url: "https://mini1.speedtest.lv.prod.hosts.ooklaserver.net:8080/hello?nocache" },
       { id: "eu-rezekne-starnet", country: "Latvia", continent: "Europe", region: "Rezekne", lat: 56.5103, lon: 27.3400, url: "https://speedtest.starnet.lv.prod.hosts.ooklaserver.net:8080/hello?nocache" },
@@ -163,7 +165,7 @@
     ];
 
     const CONTINENT_SEED_IDS = {
-      "Europe": ["eu-frankfurt-linode", "pl-warsaw-netia-s-a", "eu-vilnius-telia", "lv-riga-as-balticom", "ee-tallinn-tele2-eesti", "eu-london-linode", "eu-rome-fastweb", "eu-oslo-telenor", "istanbul-turknet"],
+      "Europe": ["eu-frankfurt-linode", "eu-london-linode", "eu-rome-fastweb", "eu-oslo-telenor", "istanbul-turknet"],
       "North America": ["na-us-east-linode", "global-north-america-chicago", "global-north-america-toronto", "na-us-west-vultr", "global-north-america-mexico-city"],
       "Asia": ["global-asia-dubai", "global-asia-mumbai", "asia-singapore-linode", "asia-tokyo-linode", "global-asia-seoul"],
       "Africa": ["global-africa-cairo", "global-africa-lagos", "global-africa-nairobi", "af-johannesburg-vultr", "global-africa-cape-town"],
@@ -172,12 +174,12 @@
     };
 
     const GLOBAL_SEED_IDS = [
-      "eu-frankfurt-linode", "eu-london-linode", "eu-vilnius-telia",
+      "eu-frankfurt-linode", "eu-london-linode",
       "na-us-east-linode", "na-us-west-vultr",
       "global-asia-dubai", "asia-singapore-linode",
       "global-africa-cairo", "global-africa-lagos",
       "sa-sao-paulo-vultr", "global-south-america-lima",
-      "global-oceania-melbourne"
+      "global-oceania-melbourne", "oceania-sydney-linode"
     ];
 
     const probeById = new Map(probes.map(p => [p.id, p]));
