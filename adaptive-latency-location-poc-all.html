@@ -2344,20 +2344,29 @@
       out.textContent = `${message}\n\n${out.textContent}`;
     }
 
+    function formatElapsedMs(ms) {
+      const totalSeconds = Math.max(0, Math.round(ms / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    }
+
     async function run() {
       const runControl = createRunControl();
       activeRunControl = runControl;
       runButton.disabled = true;
       stopButton.disabled = false;
       out.textContent = "Starting...\n";
+      const runStartedAt = performance.now();
       const config = getConfigFromInputs();
       const progressLog = [];
       const progress = ({ finished, total, result, separator }) => {
+        const elapsed = formatElapsedMs(performance.now() - runStartedAt);
         if (separator) {
-          progressLog.push(separator);
+          progressLog.push(`[${elapsed}] ${separator}`);
         } else {
           progressLog.push(
-            `[${finished}/${total}] ${result?.id || "unknown"} ${
+            `[${elapsed}] [${finished}/${total}] ${result?.id || "unknown"} ${
               result?.ok ? `${result.scoreMs}ms` : "failed"
             }`
           );
@@ -2379,6 +2388,8 @@
         const payload = {
           estimate,
           config,
+          elapsedMs: Math.round(performance.now() - runStartedAt),
+          elapsed: formatElapsedMs(performance.now() - runStartedAt),
           strategy: {
             name: "adaptive-nearest-neighbor",
             description: `Global seed pick, continent seed pick, nearest-neighbor expansion, nearby-country expansion, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest.`,
@@ -2405,12 +2416,12 @@
         };
 
         out.textContent =
-          `Finished.\n\nProgress log:\n${progressLog.join("\n")}\n\nResult:\n` +
+          `Finished in ${formatElapsedMs(performance.now() - runStartedAt)}.\n\nProgress log:\n${progressLog.join("\n")}\n\nResult:\n` +
           JSON.stringify(payload, null, 2);
         console.log(payload);
       } catch (error) {
         if (isStoppedError(error)) {
-          out.textContent = `Stopped.\n\nProgress log:\n${progressLog.join("\n")}`;
+          out.textContent = `Stopped after ${formatElapsedMs(performance.now() - runStartedAt)}.\n\nProgress log:\n${progressLog.join("\n")}`;
         } else {
           out.textContent = `Error: ${error?.message || String(error)}\n\n${error?.stack || ""}`;
         }
