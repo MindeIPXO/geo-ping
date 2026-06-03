@@ -32,6 +32,8 @@
     <label>Search radius km <input id="edgeSearchRadiusKm" type="number" min="25" max="2000" value="250" /></label>
     <label>Latency weight power <input id="timingWeightPower" type="number" min="1" max="6" value="4" /></label>
     <label>Pull % <input id="virtualPullPercent" type="number" min="1" max="100" value="25" /></label>
+    <label>Fast refine <=ms <input id="localRefineTriggerMs" type="number" min="0" max="100" value="20" /></label>
+    <label>Refine radius km <input id="localRefineRadiusKm" type="number" min="25" max="1000" value="200" /></label>
     <label>Max rounds <input id="maxRounds" type="number" min="1" max="20" value="10" /></label>
     <label>Confirm top <input id="confirmTopCount" type="number" min="1" max="10" value="4" /></label>
   </div>
@@ -2323,6 +2325,7 @@
       logVirtualLocation("edge seed wave", virtualLocation, progress);
       let activeAnchors = edgeProbes;
       let roundsWithoutImprovement = 0;
+      const locallyRefinedProbeIds = new Set();
 
       for (let round = 1; round <= config.maxRounds; round++) {
         assertNotStopped(runControl);
@@ -2378,10 +2381,66 @@
         virtualLocation = nextVirtualLocation || virtualLocation;
         logVirtualLocation(`round ${round}`, virtualLocation, progress);
         roundsWithoutImprovement = improved ? 0 : roundsWithoutImprovement + 1;
+        let localRefine = null;
+        let stopAfterLocalRefine = false;
+
+        if (
+          config.localRefineTriggerMs > 0 &&
+          best?.ok &&
+          hasLatLon(best) &&
+          best.scoreMs <= config.localRefineTriggerMs &&
+          !locallyRefinedProbeIds.has(best.id)
+        ) {
+          const triggerProbe = best;
+          locallyRefinedProbeIds.add(triggerProbe.id);
+
+          const localRefineProbes = probesAroundSearchPoints(
+            [{ ...triggerProbe, index: 0, round: `${round}-local-refine` }],
+            continentProbes,
+            new Set(measuredMap.keys()),
+            config.localRefineRadiusKm,
+            edgeProbeCount
+          );
+
+          if (localRefineProbes.length) {
+            progressMessage(`Fast local refine: ${triggerProbe.id} scored ${triggerProbe.scoreMs}ms. Measuring ${localRefineProbes.length} nearest probes within ${config.localRefineRadiusKm} km...`);
+
+            const localRefineResults = await measureProbeSet(
+              localRefineProbes,
+              `local-refine-round-${round}`,
+              config,
+              measuredMap,
+              progress,
+              runControl
+            );
+
+            const successfulAfterLocalRefine = [...measuredMap.values()].filter(r => r.ok);
+            const bestAfterLocalRefine = getBestResult(successfulAfterLocalRefine);
+            const localSuccessfulResults = localRefineResults.filter(r => r.ok && hasLatLon(r));
+
+            if (bestAfterLocalRefine && (!best || bestAfterLocalRefine.scoreMs < best.scoreMs)) {
+              best = bestAfterLocalRefine;
+            }
+
+            virtualLocation = virtualLocationFromResults(successfulAfterLocalRefine, config.edgeProbeCount, config.timingWeightPower) || virtualLocation;
+            activeAnchors = localSuccessfulResults.length
+              ? localSuccessfulResults.sort((a, b) => a.scoreMs - b.scoreMs).slice(0, edgeProbeCount)
+              : activeAnchors;
+            localRefine = {
+              triggerProbe: compactResult(triggerProbe),
+              measuredThisRound: localRefineResults.length,
+              radiusKm: config.localRefineRadiusKm,
+              virtualLocation
+            };
+            stopAfterLocalRefine = true;
+            logVirtualLocation(`local refine after round ${round}`, virtualLocation, progress);
+          }
+        }
 
         rounds.push({
           round,
           measuredThisRound: roundResults.length,
+          localRefine,
           improved,
           previousBestScore,
           currentBest: compactResult(best),
@@ -2392,6 +2451,7 @@
           activeAnchors: activeAnchors.map(compactResult)
         });
 
+        if (stopAfterLocalRefine) break;
         if (roundsWithoutImprovement >= STOP_AFTER_ROUNDS_WITHOUT_IMPROVEMENT) break;
 
         await sleep(ROUND_PAUSE_MS);
@@ -2494,6 +2554,8 @@
         edgeSearchRadiusKm: clampNumber(document.getElementById("edgeSearchRadiusKm").value, 25, 2000, 250),
         timingWeightPower: clampNumber(document.getElementById("timingWeightPower").value, 1, 6, 4),
         virtualPullFactor: clampNumber(document.getElementById("virtualPullPercent").value, 1, 100, 25) / 100,
+        localRefineTriggerMs: clampNumber(document.getElementById("localRefineTriggerMs").value, 0, 100, 20),
+        localRefineRadiusKm: clampNumber(document.getElementById("localRefineRadiusKm").value, 25, 1000, 200),
         maxRounds: clampNumber(document.getElementById("maxRounds").value, 1, 20, 10),
         confirmTopCount: clampNumber(document.getElementById("confirmTopCount").value, 1, 10, 5)
       };
@@ -2540,7 +2602,7 @@
           config,
           strategy: {
             name: "edge-guided-virtual-location",
-            description: `Global seed pick, ${config.edgeProbeCount} geographically edge probes, virtual location from the top ${config.edgeProbeCount} fastest measured probes using ${latencyWeightDescription(config.timingWeightPower)}, coordinates pulled ${Math.round(config.virtualPullFactor * 100)}% toward that location, one nearest unmeasured probe per shifted coordinate each round, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest merged with confirmation results.`,
+            description: `Global seed pick, ${config.edgeProbeCount} geographically edge probes, virtual location from the top ${config.edgeProbeCount} fastest measured probes using ${latencyWeightDescription(config.timingWeightPower)}, coordinates pulled ${Math.round(config.virtualPullFactor * 100)}% toward that location, one nearest unmeasured probe per shifted coordinate each round, fast local refine at ${config.localRefineTriggerMs}ms or better, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest merged with confirmation results.`,
             note: "This intentionally avoids measuring every probe in the continent."
           },
           narrowing: {
