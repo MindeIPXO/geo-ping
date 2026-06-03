@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 import requests
 
 
-API_URL = "http://www.speedtest.net/api/js/config-sdk"
-SPEEDTEST_HOME_URL = "http://www.speedtest.net/"
+API_URL = "https://www.speedtest.net/api/js/config-sdk"
+SPEEDTEST_HOME_URL = "https://www.speedtest.net/"
 
 OUTPUT_JSON = "europe-speedtest-servers.json"
 OUTPUT_JS = "europe-speedtest-servers.js"
@@ -19,7 +19,63 @@ REQUEST_DELAY_SECONDS = 0.5
 
 
 EUROPE_COUNTRIES = [
-    "Moscow",
+    # "New York",
+    # "Los Angeles",
+    "United States",
+    # "Houston",
+    # "Miami",
+    # "Seattle",
+    # "San Francisco",
+    # "Washington DC",
+    # "Boston",
+    # "Philadelphia",
+    # "San Diego",
+    # "San Jose",
+    # "Austin",
+    # "Columbus",
+    # "Fort Worth",
+    # "Charlotte",
+    # "Indianapolis",
+    # "Jacksonville",
+    # "San Antonio",
+    # "San Francisco",
+    # "Seattle",
+    # "Washington DC",
+    # "Boston",
+    # "Philadelphia",
+    # "San Diego",
+    # "San Jose",
+    # "Austin",
+    # "Columbus",
+    # "Fort Worth",
+    # "Charlotte",
+    # "Indianapolis",
+    # "Jacksonville",
+    # "San Antonio",
+    # "San Francisco",
+    # "Seattle",
+    # "Washington DC",
+    # "Boston",
+    # "Philadelphia",
+    # "San Diego",
+    # "San Jose",
+    # "Austin",
+    # "Columbus",
+    # "Fort Worth",
+    # "Charlotte",
+    # "Indianapolis",
+    # "Jacksonville",
+    # "San Antonio",
+    # "San Francisco",
+    # "Seattle",
+    # "Washington DC",
+    # "Boston",
+    # "Philadelphia",
+    # "San Diego",
+    # "San Jose",
+    # "Austin",
+    # "Columbus",
+    # "Fort Worth",
     # "Albania",
     # "Andorra",
     # "Austria",
@@ -178,7 +234,7 @@ def normalize_server(server: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return {
         "id": build_entry_id(server),
         "country": server["country"].strip(),
-        "continent": "Europe",
+        "continent": "North America",
         "region": server["name"].strip(),
         "lat": float(server["lat"]),
         "lon": float(server["lon"]),
