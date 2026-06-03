@@ -1,0 +1,902 @@
+[
+  {
+    "id": "us-addison-ny-armstrong-cable",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Addison, NY",
+    "lat": 42.1029,
+    "lon": -77.2336,
+    "url": "http://speedtest-ad-1.zoominternet.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-albany-ny-greenlight-networks",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Albany, NY",
+    "lat": 42.6525,
+    "lon": -73.7572,
+    "url": "http://speedtest-albany.greenlightnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-albany-ny-inoc-data-centers",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Albany, NY",
+    "lat": 42.6525,
+    "lon": -73.7572,
+    "url": "http://speedtest.inoc.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-allentown-pa-tierpoint-llc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Allentown, PA",
+    "lat": 40.6023,
+    "lon": -75.4714,
+    "url": "http://speedtest.tierpoint.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-alpena-mi-lakeshore-fiber",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Alpena, MI",
+    "lat": 45.0617,
+    "lon": -83.4328,
+    "url": "http://alpenaookla.aspensmart.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-bethlehem-pa-greenlight-networks",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Bethlehem, PA",
+    "lat": 40.6259,
+    "lon": -75.3705,
+    "url": "http://speedtest-bethlehem.greenlightnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-bethlehem-pa-snyder-technologies",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Bethlehem, PA",
+    "lat": 40.6259,
+    "lon": -75.3705,
+    "url": "http://lsdspeed02.lsdops.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-binghamton-ny-greenlight-networks",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Binghamton, NY",
+    "lat": 42.0986,
+    "lon": -75.9183,
+    "url": "http://speedtest-binghamton.greenlightnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-binghamton-ny-tier-net",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Binghamton, NY",
+    "lat": 42.0971,
+    "lon": -75.9117,
+    "url": "http://ny3-speedtest.tier.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-birdsboro-pa-service-electric-cablevision",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Birdsboro, PA",
+    "lat": 40.2645,
+    "lon": -75.8041,
+    "url": "http://brd.speedtest.secv.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-boston-ma-axcelx-technologies",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Boston, MA",
+    "lat": 42.3578,
+    "lon": -71.0617,
+    "url": "http://speedtest.xcelx.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-boston-ma-hostinger",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Boston, MA",
+    "lat": 42.3578,
+    "lon": -71.0617,
+    "url": "http://srv1297897.hstgr.cloud.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-brooklyn-ny-brooklyn-fiber",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Brooklyn, NY",
+    "lat": 40.6782,
+    "lon": -73.9442,
+    "url": "http://speedtest.bkfiber.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-buffalo-ny-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Buffalo, NY",
+    "lat": 42.9039,
+    "lon": -78.6923,
+    "url": "http://speed08.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-buffalo-ny-greenlight-networks",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Buffalo, NY",
+    "lat": 42.9039,
+    "lon": -78.6923,
+    "url": "http://speedtest-buffalo.greenlightnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-burlington-vt-burlington-telecom",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Burlington, VT",
+    "lat": 44.4667,
+    "lon": -73.15,
+    "url": "http://sulfur.burlingtontelecom.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-burlington-vt-fidium",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Burlington, VT",
+    "lat": 44.4667,
+    "lon": -73.15,
+    "url": "http://speedtest.vt.mycci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-carlstadt-nj-contabo",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Carlstadt, NJ",
+    "lat": 40.8356,
+    "lon": -74.0857,
+    "url": "http://ewr.speedtest.contabo.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-clinton-nj-brightspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Clinton, NJ",
+    "lat": 40.6368,
+    "lon": -74.9099,
+    "url": "http://cltn-speedtest-02.brightspeed.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-colebrook-nh-fibercast",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Colebrook, NH",
+    "lat": 44.8943,
+    "lon": -71.4963,
+    "url": "http://speedtest.fibercast.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-eagle-river-ak-gci-red",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Eagle River, AK",
+    "lat": 61.3293,
+    "lon": -149.568,
+    "url": "http://er.speedtest.gci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-eagle-river-ak-mta",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Eagle River, AK",
+    "lat": 61.3293,
+    "lon": -149.568,
+    "url": "http://ookla.mtasolutions.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-east-hartford-ct-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "East Hartford, CT",
+    "lat": 41.7634,
+    "lon": -72.6128,
+    "url": "http://speed10.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-east-new-haven-ct-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "East New Haven, CT",
+    "lat": 41.2842,
+    "lon": -72.8685,
+    "url": "http://speed11.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-edison-nj-novoserve-llc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Edison, NJ",
+    "lat": 40.5187,
+    "lon": -74.4121,
+    "url": "http://speedtest.us.novoserve.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-ephrata-pa-uniti",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Ephrata, PA",
+    "lat": 40.1798,
+    "lon": -76.1788,
+    "url": "http://ephrata02.speedtest.windstream.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-fairbanks-ak-alaska-communications",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Fairbanks, AK",
+    "lat": 64.8401,
+    "lon": -147.72,
+    "url": "http://speedtest9000.glb.acsalaska.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-fairbanks-ak-gci-red",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Fairbanks, AK",
+    "lat": 64.8401,
+    "lon": -147.72,
+    "url": "http://fai.speedtest.gci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-greenfield-ma-gcet",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Greenfield, MA",
+    "lat": 42.5879,
+    "lon": -72.5994,
+    "url": "http://speedtest01-cty-gfld-ma-prod.gcet.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-hartford-ct-connecticut-education-network",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Hartford, CT",
+    "lat": 41.7636,
+    "lon": -72.6856,
+    "url": "http://speedtest.cteducation.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-hartford-ct-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Hartford, CT",
+    "lat": 41.7658,
+    "lon": -72.6734,
+    "url": "http://speed04.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-hazleton-pa-service-electric-cablevision",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Hazleton, PA",
+    "lat": 40.9584,
+    "lon": -75.9746,
+    "url": "http://hzl.speedtest.secv.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-honesdale-pa-wayne-highlands-school-district",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Honesdale, PA",
+    "lat": 41.5742,
+    "lon": -75.2558,
+    "url": "http://speedtest1.whsdk12.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-houghton-mi-remc1",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Houghton, MI",
+    "lat": 47.1219,
+    "lon": -88.5689,
+    "url": "http://speedtest.remc1.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-hudson-ny-mid-hudson-cablevision",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Hudson, NY",
+    "lat": 42.2257,
+    "lon": -73.7429,
+    "url": "http://speedtest.mhcable.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-ithaca-ny-cornell-university",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Ithaca, NY",
+    "lat": 42.444,
+    "lon": -76.5019,
+    "url": "http://speedtest1.net.cornell.edu.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-jamestown-ny-uniti",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Jamestown, NY",
+    "lat": 42.097,
+    "lon": -79.2353,
+    "url": "http://jamestown.speedtest.windstream.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-kotzebue-ak-gci-red",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Kotzebue, AK",
+    "lat": 66.8983,
+    "lon": -162.5967,
+    "url": "http://kotz.speedtest.gci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-manchester-nh-hub66",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Manchester, NH",
+    "lat": 42.9956,
+    "lon": -71.4548,
+    "url": "http://ookla1.hub66.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-manchester-nh-netafy-broadband",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Manchester, NH",
+    "lat": 42.9956,
+    "lon": -71.4548,
+    "url": "http://speedtest.netafy.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-marquette-mi-northern-michigan-university",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Marquette, MI",
+    "lat": 46.5567,
+    "lon": -87.3978,
+    "url": "http://speedtest.nmu.edu:8080/hello?nocache"
+  },
+  {
+    "id": "us-mount-laurel-nj-comcast",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Mount Laurel, NJ",
+    "lat": 39.934,
+    "lon": -74.891,
+    "url": "http://secretspeedsterserver2364.cpe.nj.crnrstn.comcast.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-haven-ct-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New Haven, CT",
+    "lat": 41.3083,
+    "lon": -72.9279,
+    "url": "http://speed05.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-jersey-nj-kamatera-inc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New Jersey, NJ",
+    "lat": 40.0583,
+    "lon": -74.4057,
+    "url": "http://speedtest.us-ny2.kamatera.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-edgeuno",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://spt-jfk1.edgeuno.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-frantic-link",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://speedtest.frantic.link.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-mirhosting",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://speedtest.us.mirhosting.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-natural-wireless",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://speedtest.naturalwireless.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-nitel",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://speedtest1.nyc1.nitelusa.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-optimum-online",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://speedgauge2.optonline.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-spacecore-pro-premium-vps-hosting",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://ny.st.spacecore.pro.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-spectrum",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://nycny-speedtest-ookla-01.st.charter.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-surfshark-ltd",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "url": "http://speedtest.surfshark.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-tata-communications",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "url": "http://ookla.n0v.as6453.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-uniti",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7127,
+    "lon": -74.0059,
+    "url": "http://newyork02.speedtest.windstream.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-new-york-ny-webnx-inc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "New York, NY",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "url": "http://nyc1-speedtest.webnx.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-newark-nj-planet-networks-inc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Newark, NJ",
+    "lat": 40.7315,
+    "lon": -74.1745,
+    "url": "http://speedtest1.ewr.nj.us.planet.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-newark-nj-ripplefiber",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Newark, NJ",
+    "lat": 40.7315,
+    "lon": -74.1745,
+    "url": "http://speedtest-newjersey.ripplefiber.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-newark-nj-whitesky-communications",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Newark, NJ",
+    "lat": 40.7315,
+    "lon": -74.1745,
+    "url": "http://speedtest-nwrk-nj.wtsky.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-nicholville-ny-slic-network-solutions",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Nicholville, NY",
+    "lat": 44.6977,
+    "lon": -74.6582,
+    "url": "http://speedtest.slic.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-nome-ak-gci-red",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Nome, AK",
+    "lat": 64.5011,
+    "lon": -165.4064,
+    "url": "http://nome.speedtest.gci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-nome-ak-telalaska-inc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Nome, AK",
+    "lat": 64.5011,
+    "lon": -165.4064,
+    "url": "http://speedtest-nome.arctic.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-orangeburg-ny-contabo",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Orangeburg, NY",
+    "lat": 41.0465,
+    "lon": -73.9496,
+    "url": "http://ony.speedtest.contabo.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-oxford-ma-spectrum",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Oxford, MA",
+    "lat": 42.1852,
+    "lon": -72.5636,
+    "url": "http://oxfrma-speedtest-ookla-01.st.charter.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-palmerton-pa-penteledata",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Palmerton, PA",
+    "lat": 40.8015,
+    "lon": -75.6102,
+    "url": "http://speedtest1.ptd.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-parsippany-nj-optimum-online",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Parsippany, NJ",
+    "lat": 40.8653,
+    "lon": -74.4174,
+    "url": "http://speedtest02.srv.prnynj.alticeusa.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-philadelphia-pa-dataspindle-llc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Philadelphia, PA",
+    "lat": 39.9526,
+    "lon": -75.1652,
+    "url": "http://speedtest.dataspindle.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-philadelphia-pa-furry-institute-of-technology",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Philadelphia, PA",
+    "lat": 39.95,
+    "lon": -75.1667,
+    "url": "http://phl01.screenshot.download.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-philadelphia-pa-netaryx",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Philadelphia, PA",
+    "lat": 39.95,
+    "lon": -75.1667,
+    "url": "http://speedtest.netaryx.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-philadelphia-pa-wiline-networks",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Philadelphia, PA",
+    "lat": 39.95,
+    "lon": -75.1667,
+    "url": "http://phlph0001speedtestserver02.wiline.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-piscataway-nj-reliablesite-hosting",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Piscataway, NJ",
+    "lat": 40.5549,
+    "lon": -74.4643,
+    "url": "http://nycmetro-speedtest.reliablesite.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-pittsford-ny-rochester-colo",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Pittsford, NY",
+    "lat": 43.0906,
+    "lon": -77.515,
+    "url": "http://speedtest.rochestercolo.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-plymouth-nh-nh-broadband",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Plymouth, NH",
+    "lat": 43.757,
+    "lon": -71.6878,
+    "url": "http://speedtest-01.nhbroadband.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-portland-me-fidium",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Portland, ME",
+    "lat": 43.6614,
+    "lon": -70.2558,
+    "url": "http://speedtest.me.mycci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-portland-me-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Portland, ME",
+    "lat": 43.6614,
+    "lon": -70.2558,
+    "url": "http://oak-speedtest.otelco.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-portland-me-spectrum",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Portland, ME",
+    "lat": 43.6614,
+    "lon": -70.2558,
+    "url": "http://ptldme-speedtest-ookla-01.st.charter.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-providence-ri-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Providence, RI",
+    "lat": 41.8236,
+    "lon": -71.4221,
+    "url": "http://prvdrips-ookla01.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-randolph-ny-armstrong-cable",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Randolph, NY",
+    "lat": 42.162,
+    "lon": -78.9753,
+    "url": "http://speedtest-rd-1.zoominternet.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-reading-pa-reading-school-district",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Reading, PA",
+    "lat": 40.3356,
+    "lon": -75.9269,
+    "url": "http://speedtest.readingsd.org.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-rochester-in-rtc-fiber-communications",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Rochester, IN",
+    "lat": 43.1566,
+    "lon": -77.6088,
+    "url": "http://rochester.speedtest.rtc1.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-rochester-ny-greenlight-networks",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Rochester, NY",
+    "lat": 43.1566,
+    "lon": -77.6088,
+    "url": "http://speedtest-rochester.greenlightnetworks.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-rochester-ny-rochester-institute-of-technology",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Rochester, NY",
+    "lat": 43.1566,
+    "lon": -77.6088,
+    "url": "http://speedtest.rit.edu.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-rouses-point-ny-verte",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Rouses Point, NY",
+    "lat": 44.9939,
+    "lon": -73.3649,
+    "url": "http://speedtest-rp.verte.cloud.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-scranton-pa-loop-internet",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Scranton, PA",
+    "lat": 41.409,
+    "lon": -75.6624,
+    "url": "http://speedtest.sc1.loopinternet.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-secaucus-nj-frontier",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Secaucus, NJ",
+    "lat": 40.7895,
+    "lon": -74.0565,
+    "url": "http://secaucus.nj.speedtest.frontier.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-secaucus-nj-interserver-net",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Secaucus, NJ",
+    "lat": 40.7895,
+    "lon": -74.0565,
+    "url": "http://speedtest.is.cc.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-selinsgrove-pa-image-one-technologies",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Selinsgrove, PA",
+    "lat": 40.8025,
+    "lon": -76.8631,
+    "url": "http://speedtest.image1tech.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-shrewsbury-ma-selco",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Shrewsbury, MA",
+    "lat": 42.2958,
+    "lon": -71.7133,
+    "url": "http://speedtest.townisp.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-south-royalton-vt-ecfiber",
+    "country": "United States",
+    "continent": "North America",
+    "region": "South Royalton, VT",
+    "lat": 43.8205,
+    "lon": -72.5213,
+    "url": "http://speedtest.ecfaccess.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-sparta-nj-planet-networks-inc",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Sparta, NJ",
+    "lat": 41.0361,
+    "lon": -74.6366,
+    "url": "http://speedtest1.sma.nj.us.planet.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-syracuse-ny-spectrum",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Syracuse, NY",
+    "lat": 43.0469,
+    "lon": -76.1444,
+    "url": "http://syrny-speedtest-ookla-02.st.charter.com:8080/hello?nocache"
+  },
+  {
+    "id": "us-trumansburg-ny-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Trumansburg, NY",
+    "lat": 42.5423,
+    "lon": -76.6661,
+    "url": "http://speed07.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-utica-ny-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Utica, NY",
+    "lat": 43.1009,
+    "lon": -75.2327,
+    "url": "http://speed12.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-utqiagvik-ak-gci",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Utqiagvik, AK",
+    "lat": 71.2906,
+    "lon": -156.7886,
+    "url": "http://brw.speedtest.gci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-valdez-ak-copper-valley-telecom",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Valdez, AK",
+    "lat": 61.1308,
+    "lon": -146.3483,
+    "url": "http://speed.cvtc.org.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-wasilla-ak-gci-red",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Wasilla, AK",
+    "lat": 61.5809,
+    "lon": -149.4411,
+    "url": "http://was.speedtest.gci.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-west-hartford-ct-gonetspeed",
+    "country": "United States",
+    "continent": "North America",
+    "region": "West Hartford, CT",
+    "lat": 41.7621,
+    "lon": -72.742,
+    "url": "http://speed02.gonetspeed.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-white-plains-ny-optimum-online",
+    "country": "United States",
+    "continent": "North America",
+    "region": "White Plains, NY",
+    "lat": 41.034,
+    "lon": -73.7629,
+    "url": "http://speedtest03.srv.whplny.alticeusa.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-wilkes-barre-pa-loop-internet",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Wilkes-Barre, PA",
+    "lat": 41.2459,
+    "lon": -75.8813,
+    "url": "http://speedtest.wb1.loopinternet.com.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  },
+  {
+    "id": "us-wilkes-barre-pa-snyderone-localsecuredata",
+    "country": "United States",
+    "continent": "North America",
+    "region": "Wilkes-Barre, PA",
+    "lat": 41.2459,
+    "lon": -75.8813,
+    "url": "http://lsdspeed01.lsdops.net.prod.hosts.ooklaserver.net:8080/hello?nocache"
+  }
+]

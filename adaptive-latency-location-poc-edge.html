@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Adaptive Latency Location POC</title>
+  <title>Edge-Guided Latency Location POC</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 1200px; margin: 24px auto; padding: 0 16px; line-height: 1.4; }
@@ -16,21 +16,23 @@
   </style>
 </head>
 <body>
-  <h1>Adaptive Latency Location POC</h1>
+  <h1>Edge-Guided Latency Location POC</h1>
   <div class="hint">
     Estimates network proximity from browser fetch timing. It is not true IP geolocation.
-    This version avoids measuring every probe in the selected continent by using global seeds,
-    continent seeds, nearest-neighbor expansion, nearby-country expansion, a final confirmation pass,
-    and a final-location radius retest.
+    This version starts with geographically spread edge probes, computes a latency-weighted virtual location,
+    pulls those edge coordinates toward it, then tests real probes around the recalculated coordinates.
   </div>
 
   <div class="controls">
-    <button id="run">Run adaptive latency location POC</button>
+    <button id="run">Run edge-guided latency location POC</button>
     <button id="stop" disabled>Stop</button>
     <label>Probe concurrency <input id="probeConcurrency" type="number" min="1" max="16" value="6" /></label>
     <label>Samples per probe <input id="sampleCount" type="number" min="1" max="10" value="5" /></label>
-    <label>Neighbor batch <input id="neighborBatchSize" type="number" min="2" max="24" value="10" /></label>
-    <label>Max rounds <input id="maxRounds" type="number" min="1" max="8" value="5" /></label>
+    <label>Edge probes N <input id="edgeProbeCount" type="number" min="3" max="64" value="12" /></label>
+    <label>Search radius km <input id="edgeSearchRadiusKm" type="number" min="25" max="2000" value="250" /></label>
+    <label>Latency weight power <input id="timingWeightPower" type="number" min="1" max="6" value="4" /></label>
+    <label>Pull % <input id="virtualPullPercent" type="number" min="1" max="100" value="25" /></label>
+    <label>Max rounds <input id="maxRounds" type="number" min="1" max="20" value="10" /></label>
     <label>Confirm top <input id="confirmTopCount" type="number" min="1" max="10" value="4" /></label>
   </div>
 
@@ -45,13 +47,14 @@
     const SAMPLE_PAUSE_MS = 100;
     const ROUND_PAUSE_MS = 150;
     const IMPROVEMENT_FACTOR = 0.9;
-    const STOP_AFTER_ROUNDS_WITHOUT_IMPROVEMENT = 5;
+    const STOP_AFTER_ROUNDS_WITHOUT_IMPROVEMENT = 10;
     const FINAL_RETEST_RADIUS_KM = 150;
     const STOPPED_ERROR_MESSAGE = "Run stopped by user.";
 
     /*
       Add/replace probes here. Keep id unique. Multiple probes per city/country are supported.
-      The adaptive algorithm measures only promising areas instead of the whole continent.
+      The edge-guided algorithm measures geographically spread probes, then follows the
+      latency-weighted virtual location toward denser nearby probe sets.
     */
     const probes = [
       // Europe seeds / hubs
@@ -1881,9 +1884,20 @@
       return results.filter(r => r?.ok && Number.isFinite(r.scoreMs)).sort((a, b) => a.scoreMs - b.scoreMs)[0] || null;
     }
 
+    function mergeBestResultsById(results) {
+      const byId = new Map();
+
+      for (const result of results.filter(r => r?.ok && Number.isFinite(r.scoreMs))) {
+        const existing = byId.get(result.id);
+        if (!existing || result.scoreMs < existing.scoreMs) byId.set(result.id, result);
+      }
+
+      return [...byId.values()].sort((a, b) => a.scoreMs - b.scoreMs);
+    }
+
     function compactResult(r) {
       if (!r) return null;
-      return { id: r.id, country: r.country, continent: r.continent, region: r.region, lat: r.lat, lon: r.lon, ok: r.ok, minMs: r.minMs, maxMs: r.maxMs, medianMs: r.medianMs, jitterMs: r.jitterMs, scoreMs: r.scoreMs, samplesMs: r.samplesMs, failedSamples: r.failedSamples, stages: r.stages, distanceFromRetestCenterKm: r.distanceFromRetestCenterKm };
+      return { id: r.id, country: r.country, continent: r.continent, region: r.region, lat: r.lat, lon: r.lon, ok: r.ok, minMs: r.minMs, maxMs: r.maxMs, medianMs: r.medianMs, jitterMs: r.jitterMs, scoreMs: r.scoreMs, samplesMs: r.samplesMs, failedSamples: r.failedSamples, stages: r.stages, distanceFromRetestCenterKm: r.distanceFromRetestCenterKm, distanceFromSearchPointKm: r.distanceFromSearchPointKm, searchPointIndex: r.searchPointIndex, searchRound: r.searchRound };
     }
 
     function nearestUnmeasured(centerProbe, candidates, measuredIds, limit) {
@@ -1917,6 +1931,154 @@
         }))
         .filter(probe => probe.distanceFromRetestCenterKm <= radiusKm)
         .sort((a, b) => a.distanceFromRetestCenterKm - b.distanceFromRetestCenterKm);
+    }
+
+    function averageCoordinate(items) {
+      const withCoordinates = items.filter(hasLatLon);
+      if (!withCoordinates.length) return null;
+
+      const totals = withCoordinates.reduce((acc, item) => {
+        acc.lat += item.lat;
+        acc.lon += item.lon;
+        return acc;
+      }, { lat: 0, lon: 0 });
+
+      return {
+        lat: totals.lat / withCoordinates.length,
+        lon: totals.lon / withCoordinates.length
+      };
+    }
+
+    function selectEdgiestProbes(candidates, count) {
+      const withCoordinates = uniqueById(candidates).filter(hasLatLon);
+      if (withCoordinates.length <= count) return withCoordinates;
+
+      const center = averageCoordinate(withCoordinates);
+      const selected = uniqueById([
+        [...withCoordinates].sort((a, b) => a.lat - b.lat)[0],
+        [...withCoordinates].sort((a, b) => b.lat - a.lat)[0],
+        [...withCoordinates].sort((a, b) => a.lon - b.lon)[0],
+        [...withCoordinates].sort((a, b) => b.lon - a.lon)[0],
+        [...withCoordinates].sort((a, b) => distanceKm(center, b) - distanceKm(center, a))[0]
+      ]).slice(0, count);
+
+      while (selected.length < count) {
+        const next = withCoordinates
+          .filter(probe => !selected.some(selectedProbe => selectedProbe.id === probe.id))
+          .map(probe => ({
+            probe,
+            edgeScore: Math.min(...selected.map(selectedProbe => distanceKm(probe, selectedProbe)))
+          }))
+          .sort((a, b) => b.edgeScore - a.edgeScore)[0]?.probe;
+
+        if (!next) break;
+        selected.push(next);
+      }
+
+      return selected;
+    }
+
+    function virtualLocationFromResults(results, maxCount = Infinity, timingWeightPower = 1) {
+      const usable = results
+        .filter(r => r?.ok && hasLatLon(r) && Number.isFinite(r.scoreMs))
+        .sort((a, b) => a.scoreMs - b.scoreMs)
+        .slice(0, maxCount);
+
+      if (!usable.length) return null;
+
+      let totalWeight = 0;
+      let lat = 0;
+      let lon = 0;
+
+      for (const result of usable) {
+        const weight = 1 / (Math.max(1, result.scoreMs) ** timingWeightPower);
+        totalWeight += weight;
+        lat += result.lat * weight;
+        lon += result.lon * weight;
+      }
+
+      return {
+        lat: lat / totalWeight,
+        lon: lon / totalWeight,
+        timingWeightPower,
+        usedProbeCount: usable.length,
+        bestProbe: compactResult(usable[0]),
+        usedProbes: usable.map(compactResult)
+      };
+    }
+
+    function latencyWeightDescription(timingWeightPower) {
+      return `1 / scoreMs^${timingWeightPower}`;
+    }
+
+    function formatVirtualLocation(virtualLocation) {
+      if (!virtualLocation) return "unavailable";
+
+      const lat = Number(virtualLocation.lat).toFixed(4);
+      const lon = Number(virtualLocation.lon).toFixed(4);
+      const usedProbeCount = virtualLocation.usedProbeCount || 0;
+      const weightPower = virtualLocation.timingWeightPower ? `, weight ${latencyWeightDescription(virtualLocation.timingWeightPower)}` : "";
+      const bestProbe = virtualLocation.bestProbe?.id ? `, best ${virtualLocation.bestProbe.id}` : "";
+
+      return `${lat}, ${lon} from ${usedProbeCount} probes${weightPower}${bestProbe}`;
+    }
+
+    function logVirtualLocation(label, virtualLocation, progress) {
+      const message = `Virtual coordinates after ${label}: ${formatVirtualLocation(virtualLocation)}`;
+      if (progress) progress({ separator: message });
+      else progressMessage(message);
+    }
+
+    function moveCoordinateTowardVirtualLocation(anchor, virtualLocation, pullFactor, index, round) {
+      return {
+        sourceProbeId: anchor.id,
+        sourceRegion: anchor.region,
+        sourceCountry: anchor.country,
+        lat: anchor.lat + (virtualLocation.lat - anchor.lat) * pullFactor,
+        lon: anchor.lon + (virtualLocation.lon - anchor.lon) * pullFactor,
+        pullFactor,
+        index,
+        round
+      };
+    }
+
+    function probesAroundSearchPoints(searchPoints, candidates, measuredIds, radiusKm, totalLimit) {
+      const selected = [];
+      const selectedIds = new Set();
+      const candidatesByPoint = searchPoints.map(point => {
+        return uniqueById(candidates)
+          .filter(probe => hasLatLon(probe) && !measuredIds.has(probe.id))
+          .map(probe => ({
+            ...probe,
+            distanceFromSearchPointKm: Number(distanceKm(point, probe).toFixed(2)),
+            searchPointIndex: point.index,
+            searchRound: point.round
+          }))
+          .filter(probe => probe.distanceFromSearchPointKm <= radiusKm)
+          .sort((a, b) => a.distanceFromSearchPointKm - b.distanceFromSearchPointKm);
+      });
+
+      for (const nearby of candidatesByPoint) {
+        const probe = nearby.find(candidate => !selectedIds.has(candidate.id));
+        if (probe) {
+          selected.push(probe);
+          selectedIds.add(probe.id);
+        }
+        if (selected.length >= totalLimit) return selected;
+      }
+
+      const fillCandidates = candidatesByPoint
+        .flat()
+        .filter(probe => !selectedIds.has(probe.id))
+        .sort((a, b) => a.distanceFromSearchPointKm - b.distanceFromSearchPointKm);
+
+      for (const probe of fillCandidates) {
+        if (selected.length >= totalLimit) break;
+        selected.push(probe);
+        selectedIds.add(probe.id);
+      }
+
+      return selected.slice(0, totalLimit);
     }
 
     function buildCountryRanking(results) {
@@ -2142,89 +2304,79 @@
       const measuredMap = new Map();
       const rounds = [];
 
-      const countrySeedProbes = pickCountrySeedProbes(continentProbes, measuredMap);
+      const edgeProbeCount = Math.min(config.edgeProbeCount, continentProbes.filter(hasLatLon).length);
+      const edgeProbes = selectEdgiestProbes(continentProbes, edgeProbeCount);
 
-      progressMessage(`Selected continent: ${continent}. Measuring ${countrySeedProbes.length} country seed probes...`);
+      progressMessage(`Selected continent: ${continent}. Measuring ${edgeProbes.length} geographically edge probes...`);
 
-      await measureProbeSet(
-        countrySeedProbes,
-        "country-seed",
+      const edgeResults = await measureProbeSet(
+        edgeProbes,
+        "edge-seed",
         config,
         measuredMap,
         progress,
         runControl
       );
 
-      let best = getBestResult([...measuredMap.values()]);
+      let best = getBestResult(edgeResults);
+      let virtualLocation = virtualLocationFromResults(edgeResults, Infinity, config.timingWeightPower);
+      logVirtualLocation("edge seed wave", virtualLocation, progress);
+      let activeAnchors = edgeProbes;
       let roundsWithoutImprovement = 0;
 
       for (let round = 1; round <= config.maxRounds; round++) {
         assertNotStopped(runControl);
-        if (!best) break;
+        if (!virtualLocation || !activeAnchors.length) break;
 
-        const previousBestScore = best.scoreMs;
+        const previousBestScore = best?.scoreMs ?? Infinity;
         const measuredIds = new Set(measuredMap.keys());
-
-        const promisingCountries = getPromisingCountries([...measuredMap.values()], {
-          topCountryCount: 12,
-          maxCountryBestMs: 100,
-          withinBestMs: 60
-        });
-
-        const adaptiveCandidates = continentProbes.filter(p =>
-          promisingCountries.has(p.country)
+        const searchPoints = activeAnchors.map((anchor, index) =>
+          moveCoordinateTowardVirtualLocation(anchor, virtualLocation, config.virtualPullFactor, index, round)
         );
 
-        const topFrontier = [...measuredMap.values()]
-          .filter(r =>
-            r.ok &&
-            Number.isFinite(r.scoreMs) &&
-            promisingCountries.has(r.country)
-          )
-          .sort((a, b) => a.scoreMs - b.scoreMs)
-          .slice(0, 5);
-
-        const perFrontierLimit = Math.ceil(config.neighborBatchSize / Math.max(1, topFrontier.length));
-
-        const nextProbes = uniqueById(
-          topFrontier.flatMap(frontierProbe =>
-            buildDiverseNextWave(
-              frontierProbe,
-              adaptiveCandidates,
-              measuredIds,
-              perFrontierLimit,
-              round,
-              config.maxRounds
-            )
-          )
-        ).slice(0, config.neighborBatchSize);
+        const nextProbes = probesAroundSearchPoints(
+          searchPoints,
+          continentProbes,
+          measuredIds,
+          config.edgeSearchRadiusKm,
+          edgeProbeCount
+        );
 
         if (!nextProbes.length) {
           rounds.push({
             round,
-            reason: "no-unmeasured-promising-candidates",
+            reason: "no-unmeasured-probes-near-recalculated-coordinates",
             measuredCount: measuredMap.size,
-            best: compactResult(best)
+            virtualLocation,
+            searchPoints
           });
           break;
         }
 
-        progressMessage(`Round ${round}: measuring ${nextProbes.length} probes from promising countries...`);
+        progressMessage(`Round ${round}: measuring ${nextProbes.length} probes, one nearest candidate per recalculated edge coordinate...`);
 
         const roundResults = await measureProbeSet(
           nextProbes,
-          `neighbor-round-${round}`,
+          `edge-guided-round-${round}`,
           config,
           measuredMap,
           progress,
           runControl
         );
 
-        const newBest = getBestResult([...measuredMap.values()]);
+        const successfulMeasured = [...measuredMap.values()].filter(r => r.ok);
+        const newBest = getBestResult(successfulMeasured);
         const improved = newBest && newBest.scoreMs < previousBestScore * IMPROVEMENT_FACTOR;
 
-        if (newBest && newBest.scoreMs < best.scoreMs) best = newBest;
+        if (newBest && (!best || newBest.scoreMs < best.scoreMs)) best = newBest;
 
+        const nextVirtualLocation = virtualLocationFromResults(successfulMeasured, config.edgeProbeCount, config.timingWeightPower);
+        const successfulRoundResults = roundResults.filter(r => r.ok && hasLatLon(r));
+        activeAnchors = successfulRoundResults.length
+          ? successfulRoundResults.sort((a, b) => a.scoreMs - b.scoreMs).slice(0, edgeProbeCount)
+          : activeAnchors;
+        virtualLocation = nextVirtualLocation || virtualLocation;
+        logVirtualLocation(`round ${round}`, virtualLocation, progress);
         roundsWithoutImprovement = improved ? 0 : roundsWithoutImprovement + 1;
 
         rounds.push({
@@ -2234,7 +2386,10 @@
           previousBestScore,
           currentBest: compactResult(best),
           roundsWithoutImprovement,
-          promisingCountries: [...promisingCountries]
+          virtualLocation,
+          virtualLocationSource: `top ${config.edgeProbeCount} fastest measured probes`,
+          searchPoints,
+          activeAnchors: activeAnchors.map(compactResult)
         });
 
         if (roundsWithoutImprovement >= STOP_AFTER_ROUNDS_WITHOUT_IMPROVEMENT) break;
@@ -2267,14 +2422,15 @@
       progressMessage(`Retesting ${radiusRetestProbes.length} probes within ${FINAL_RETEST_RADIUS_KM} km of the provisional final location...`);
       const radiusRetestResults = await measureProbeSet(radiusRetestProbes, "final-radius-retest", config, new Map(), progress, runControl);
       const successfulRadiusRetestResults = radiusRetestResults.filter(r => r.ok).sort((a, b) => a.scoreMs - b.scoreMs);
-      const finalResults = successfulRadiusRetestResults.length ? successfulRadiusRetestResults : confirmedResults;
+      const finalResults = mergeBestResultsById([...confirmedResults, ...successfulRadiusRetestResults]);
       const finalSelectedProbe = getBestResult(finalResults) || provisionalFinalProbe;
 
       return {
         selectedContinent: continent,
         selectedProbe: compactResult(finalSelectedProbe),
         adaptiveRounds: rounds,
-        // seedProbeCount: seedProbes.length,
+        edgeProbeCount: edgeProbes.length,
+        edgeProbes: edgeProbes.map(compactResult),
         measuredProbeCount: measuredMap.size,
         confirmationProbeCount: confirmationResults.length,
         finalRetestRadiusKm: FINAL_RETEST_RADIUS_KM,
@@ -2334,8 +2490,11 @@
       return {
         probeConcurrency: clampNumber(document.getElementById("probeConcurrency").value, 1, 16, 6),
         sampleCount: clampNumber(document.getElementById("sampleCount").value, 1, 10, 3),
-        neighborBatchSize: clampNumber(document.getElementById("neighborBatchSize").value, 2, 24, 8),
-        maxRounds: clampNumber(document.getElementById("maxRounds").value, 1, 8, 4),
+        edgeProbeCount: clampNumber(document.getElementById("edgeProbeCount").value, 3, 64, 12),
+        edgeSearchRadiusKm: clampNumber(document.getElementById("edgeSearchRadiusKm").value, 25, 2000, 250),
+        timingWeightPower: clampNumber(document.getElementById("timingWeightPower").value, 1, 6, 4),
+        virtualPullFactor: clampNumber(document.getElementById("virtualPullPercent").value, 1, 100, 25) / 100,
+        maxRounds: clampNumber(document.getElementById("maxRounds").value, 1, 20, 10),
         confirmTopCount: clampNumber(document.getElementById("confirmTopCount").value, 1, 10, 5)
       };
     }
@@ -2380,14 +2539,15 @@
           estimate,
           config,
           strategy: {
-            name: "adaptive-nearest-neighbor",
-            description: `Global seed pick, continent seed pick, nearest-neighbor expansion, nearby-country expansion, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest.`,
+            name: "edge-guided-virtual-location",
+            description: `Global seed pick, ${config.edgeProbeCount} geographically edge probes, virtual location from the top ${config.edgeProbeCount} fastest measured probes using ${latencyWeightDescription(config.timingWeightPower)}, coordinates pulled ${Math.round(config.virtualPullFactor * 100)}% toward that location, one nearest unmeasured probe per shifted coordinate each round, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest merged with confirmation results.`,
             note: "This intentionally avoids measuring every probe in the continent."
           },
           narrowing: {
             selectedContinent: continentPick.selectedContinent,
             continentRanking: continentPick.continentRanking,
-            seedProbeCount: adaptive.seedProbeCount,
+            edgeProbeCount: adaptive.edgeProbeCount,
+            edgeProbes: adaptive.edgeProbes,
             measuredProbeCountBeforeConfirmation: adaptive.measuredProbeCount,
             confirmationProbeCount: adaptive.confirmationProbeCount,
             finalRetestRadiusKm: adaptive.finalRetestRadiusKm,
