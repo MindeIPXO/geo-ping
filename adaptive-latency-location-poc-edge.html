@@ -2033,9 +2033,9 @@
 
     function moveCoordinateTowardVirtualLocation(anchor, virtualLocation, pullFactor, index, round) {
       return {
-        sourceProbeId: anchor.id,
-        sourceRegion: anchor.region,
-        sourceCountry: anchor.country,
+        sourceProbeId: anchor.sourceProbeId || anchor.id,
+        sourceRegion: anchor.sourceRegion || anchor.region,
+        sourceCountry: anchor.sourceCountry || anchor.country,
         lat: anchor.lat + (virtualLocation.lat - anchor.lat) * pullFactor,
         lon: anchor.lon + (virtualLocation.lon - anchor.lon) * pullFactor,
         pullFactor,
@@ -2374,10 +2374,7 @@
         if (newBest && (!best || newBest.scoreMs < best.scoreMs)) best = newBest;
 
         const nextVirtualLocation = virtualLocationFromResults(successfulMeasured, config.edgeProbeCount, config.timingWeightPower);
-        const successfulRoundResults = roundResults.filter(r => r.ok && hasLatLon(r));
-        activeAnchors = successfulRoundResults.length
-          ? successfulRoundResults.sort((a, b) => a.scoreMs - b.scoreMs).slice(0, edgeProbeCount)
-          : activeAnchors;
+        activeAnchors = searchPoints;
         virtualLocation = nextVirtualLocation || virtualLocation;
         logVirtualLocation(`round ${round}`, virtualLocation, progress);
         roundsWithoutImprovement = improved ? 0 : roundsWithoutImprovement + 1;
@@ -2416,16 +2413,12 @@
 
             const successfulAfterLocalRefine = [...measuredMap.values()].filter(r => r.ok);
             const bestAfterLocalRefine = getBestResult(successfulAfterLocalRefine);
-            const localSuccessfulResults = localRefineResults.filter(r => r.ok && hasLatLon(r));
 
             if (bestAfterLocalRefine && (!best || bestAfterLocalRefine.scoreMs < best.scoreMs)) {
               best = bestAfterLocalRefine;
             }
 
             virtualLocation = virtualLocationFromResults(successfulAfterLocalRefine, config.edgeProbeCount, config.timingWeightPower) || virtualLocation;
-            activeAnchors = localSuccessfulResults.length
-              ? localSuccessfulResults.sort((a, b) => a.scoreMs - b.scoreMs).slice(0, edgeProbeCount)
-              : activeAnchors;
             localRefine = {
               triggerProbe: compactResult(triggerProbe),
               measuredThisRound: localRefineResults.length,
