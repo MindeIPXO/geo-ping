@@ -31,12 +31,8 @@
     <label>Random countries N <input id="edgeProbeCount" type="number" min="3" max="64" value="16" /></label>
     <label>Best vector % <input id="bestVectorPercent" type="number" min="5" max="100" value="60" /></label>
     <label>Search radius km <input id="edgeSearchRadiusKm" type="number" min="25" max="2000" value="200" /></label>
-    <label>Converged <=km <input id="vectorConvergedKm" type="number" min="0" max="100" value="5" /></label>
-    <label>Min converge rounds <input id="minConvergeRounds" type="number" min="1" max="20" value="3" /></label>
-    <label>Max expanded radius km <input id="maxExpandedSearchRadiusKm" type="number" min="25" max="5000" value="800" /></label>
     <label>Latency weight power <input id="timingWeightPower" type="number" min="1" max="6" value="3" /></label>
     <label>Vector step % <input id="virtualPullPercent" type="number" min="1" max="2000" value="1000" /></label>
-    <label>Min vector step km <input id="minVectorStepKm" type="number" min="0" max="1000" value="150" /></label>
     <label>Fast refine <=ms <input id="localRefineTriggerMs" type="number" min="0" max="100" value="18" /></label>
     <label>Refine radius km <input id="localRefineRadiusKm" type="number" min="25" max="1000" value="120" /></label>
     <label>Max rounds <input id="maxRounds" type="number" min="1" max="20" value="20" /></label>
@@ -1708,11 +1704,11 @@
 
     const GLOBAL_SEED_IDS = [
       "de-frankfurt-tele-ag", "gb-london-community-fibre-limited", "no-oslo-broadnet",
-      // "us-addison-ny-armstrong-cable", "us-piscataway-nj-reliablesite-hosting", "na-us-east-linode", "na-us-west-vultr",
-      // "global-asia-dubai", "asia-singapore-linode", "asia-tokyo-linode",
-      // "global-africa-cairo", "global-africa-lagos",
-      // "sa-sao-paulo-vultr", "global-south-america-lima",
-      // "global-oceania-melbourne", "oceania-sydney-linode"
+      "us-addison-ny-armstrong-cable", "us-piscataway-nj-reliablesite-hosting", "na-us-east-linode", "na-us-west-vultr",
+      "global-asia-dubai", "asia-singapore-linode", "asia-tokyo-linode",
+      "global-africa-cairo", "global-africa-lagos",
+      "sa-sao-paulo-vultr", "global-south-america-lima",
+      "global-oceania-melbourne", "oceania-sydney-linode"
     ];
 
     const probeById = new Map(probes.map(p => [p.id, p]));
@@ -2077,21 +2073,16 @@
       };
     }
 
-    function vectorSearchCenterFromModel(vectorModel, vectorStepFactor, minVectorStepKm, round) {
-      const requestedStepKm = vectorModel.distanceKm * vectorStepFactor;
-      const effectiveVectorStepFactor = vectorModel.distanceKm > 0 && requestedStepKm < minVectorStepKm
-        ? minVectorStepKm / vectorModel.distanceKm
-        : vectorStepFactor;
-
+    function translateCoordinateByVector(anchor, vectorModel, vectorStepFactor, index, round) {
       return {
-        source: "all-virtual-plus-vector",
-        lat: vectorModel.allVirtual.lat + vectorModel.latDelta * effectiveVectorStepFactor,
-        lon: vectorModel.allVirtual.lon + vectorModel.lonDelta * effectiveVectorStepFactor,
+        sourceProbeId: anchor.sourceProbeId || anchor.id,
+        sourceRegion: anchor.sourceRegion || anchor.region,
+        sourceCountry: anchor.sourceCountry || anchor.country,
+        lat: anchor.lat + vectorModel.latDelta * vectorStepFactor,
+        lon: anchor.lon + vectorModel.lonDelta * vectorStepFactor,
         vectorStepFactor,
-        effectiveVectorStepFactor,
-        effectiveVectorStepKm: Number((vectorModel.distanceKm * effectiveVectorStepFactor).toFixed(2)),
         vectorDistanceKm: vectorModel.distanceKm,
-        index: 0,
+        index,
         round
       };
     }
@@ -2177,59 +2168,6 @@
       }
 
       return selected.slice(0, totalLimit);
-    }
-
-    function probesAroundSearchPointsWithExpansion(searchPoints, candidates, measuredIds, radiusKm, maxRadiusKm, totalLimit) {
-      let currentRadiusKm = radiusKm;
-      let selected = probesAroundSearchPoints(searchPoints, candidates, measuredIds, currentRadiusKm, totalLimit);
-
-      while (selected.length < totalLimit && currentRadiusKm < maxRadiusKm) {
-        currentRadiusKm = Math.min(maxRadiusKm, currentRadiusKm * 2);
-        selected = probesAroundSearchPoints(searchPoints, candidates, measuredIds, currentRadiusKm, totalLimit);
-      }
-
-      return {
-        probes: selected,
-        radiusKm: currentRadiusKm,
-        expanded: currentRadiusKm > radiusKm
-      };
-    }
-
-    function selectVectorWaveProbes(vectorModel, config, round, continentProbes, measuredIds, totalLimit) {
-      const minStepFactor = 0.25;
-      let stepFactor = config.virtualPullFactor;
-
-      while (stepFactor >= minStepFactor) {
-        const searchCenter = vectorSearchCenterFromModel(vectorModel, stepFactor, config.minVectorStepKm, round);
-        const searchPoints = [searchCenter];
-        const selection = probesAroundSearchPointsWithExpansion(
-          searchPoints,
-          continentProbes,
-          measuredIds,
-          config.edgeSearchRadiusKm,
-          config.maxExpandedSearchRadiusKm,
-          totalLimit
-        );
-
-        if (selection.probes.length) {
-          return {
-            searchCenter,
-            searchPoints,
-            selection,
-            stepBackoffApplied: stepFactor !== config.virtualPullFactor
-          };
-        }
-
-        stepFactor /= 2;
-      }
-
-      const searchCenter = vectorSearchCenterFromModel(vectorModel, minStepFactor, config.minVectorStepKm, round);
-      return {
-        searchCenter,
-        searchPoints: [searchCenter],
-        selection: { probes: [], radiusKm: config.maxExpandedSearchRadiusKm, expanded: true },
-        stepBackoffApplied: minStepFactor !== config.virtualPullFactor
-      };
     }
 
     function buildCountryRanking(results) {
@@ -2474,41 +2412,27 @@
       let virtualLocation = vectorModel?.bestVectorVirtual || targetLocationFromResults(randomSeedResults, randomCountryProbeCount, config.timingWeightPower);
       if (progress) progress({ separator: `Vector after random country seed wave: ${formatVectorModel(vectorModel)}` });
       logVirtualLocation(`random country seed wave best ${config.bestVectorPercent}%`, virtualLocation, progress);
+      let activeAnchors = randomCountryProbes;
       let roundsWithoutImprovement = 0;
       const locallyRefinedProbeIds = new Set();
 
       for (let round = 1; round <= config.maxRounds; round++) {
         assertNotStopped(runControl);
-        if (!vectorModel) break;
+        if (!vectorModel || !activeAnchors.length) break;
 
         const previousBestScore = best?.scoreMs ?? Infinity;
         const measuredIds = new Set(measuredMap.keys());
-        const vectorProbeSelection = selectVectorWaveProbes(
-          vectorModel,
-          config,
-          round,
+        const searchPoints = activeAnchors.map((anchor, index) =>
+          translateCoordinateByVector(anchor, vectorModel, config.virtualPullFactor, index, round)
+        );
+
+        const nextProbes = probesAroundSearchPoints(
+          searchPoints,
           continentProbes,
           measuredIds,
+          config.edgeSearchRadiusKm,
           randomCountryProbeCount
         );
-        const searchCenter = vectorProbeSelection.searchCenter;
-        const searchPoints = vectorProbeSelection.searchPoints;
-
-        if (round > config.minConvergeRounds && config.vectorConvergedKm > 0 && vectorModel.distanceKm <= config.vectorConvergedKm) {
-          progressMessage(`Vector converged at ${vectorModel.distanceKm} km. Stopping exploration and confirming current best probes...`);
-          rounds.push({
-            round,
-            reason: "vector-converged",
-            measuredCount: measuredMap.size,
-            vectorModel,
-            virtualLocation,
-            searchCenter
-          });
-          break;
-        }
-
-        const nextProbeSelection = vectorProbeSelection.selection;
-        const nextProbes = nextProbeSelection.probes;
 
         if (!nextProbes.length) {
           rounds.push({
@@ -2521,17 +2445,7 @@
           break;
         }
 
-        if (vectorProbeSelection.stepBackoffApplied) {
-          progressMessage(`Vector step backed off to ${Math.round(searchCenter.effectiveVectorStepFactor * 100)}% to keep the search center near available probes.`);
-        }
-
-        if (nextProbeSelection.expanded) {
-          progressMessage(`Expanded search radius from ${config.edgeSearchRadiusKm} km to ${nextProbeSelection.radiusKm} km to collect ${nextProbes.length}/${randomCountryProbeCount} probes.`);
-        } else if (nextProbes.length < randomCountryProbeCount) {
-          progressMessage(`Only ${nextProbes.length}/${randomCountryProbeCount} unmeasured probes found near the vector center. Measuring the sparse wave anyway...`);
-        }
-
-        progressMessage(`Round ${round}: measuring ${nextProbes.length} nearest probes around one vector search center (${Number(searchCenter.lat).toFixed(4)}, ${Number(searchCenter.lon).toFixed(4)}) within ${nextProbeSelection.radiusKm} km, ${searchCenter.effectiveVectorStepKm} km along ${formatVectorModel(vectorModel)}...`);
+        progressMessage(`Round ${round}: measuring ${nextProbes.length} probes after translating coordinates by vector ${formatVectorModel(vectorModel)}...`);
 
         const roundResults = await measureProbeSet(
           nextProbes,
@@ -2550,6 +2464,7 @@
 
         vectorModel = vectorModelFromWaveResults(roundResults, randomCountryProbeCount, config.bestVectorPercent, config.timingWeightPower) || vectorModel;
         const nextVirtualLocation = vectorModel?.bestVectorVirtual || targetLocationFromResults(successfulMeasured, randomCountryProbeCount, config.timingWeightPower);
+        activeAnchors = searchPoints;
         virtualLocation = nextVirtualLocation || virtualLocation;
         if (progress) progress({ separator: `Vector after round ${round}: ${formatVectorModel(vectorModel)}` });
         logVirtualLocation(`round ${round} best ${config.bestVectorPercent}%`, virtualLocation, progress);
@@ -2619,9 +2534,8 @@
           vectorModel,
           virtualLocation,
           virtualLocationSource: `best ${config.bestVectorPercent}% of latest ${randomCountryProbeCount}-probe wave`,
-          searchCenter,
-          searchRadiusKm: nextProbeSelection.radiusKm,
-          searchPoints
+          searchPoints,
+          activeAnchors: activeAnchors.map(compactResult)
         });
 
         if (stopAfterLocalRefine) break;
@@ -2727,12 +2641,8 @@
         edgeProbeCount: clampNumber(document.getElementById("edgeProbeCount").value, 3, 64, 20),
         bestVectorPercent: clampNumber(document.getElementById("bestVectorPercent").value, 5, 100, 15),
         edgeSearchRadiusKm: clampNumber(document.getElementById("edgeSearchRadiusKm").value, 25, 2000, 250),
-        vectorConvergedKm: clampNumber(document.getElementById("vectorConvergedKm").value, 0, 100, 5),
-        minConvergeRounds: clampNumber(document.getElementById("minConvergeRounds").value, 1, 20, 3),
-        maxExpandedSearchRadiusKm: clampNumber(document.getElementById("maxExpandedSearchRadiusKm").value, 25, 5000, 800),
         timingWeightPower: clampNumber(document.getElementById("timingWeightPower").value, 1, 6, 4),
-        virtualPullFactor: clampNumber(document.getElementById("virtualPullPercent").value, 1, 2000, 1000) / 100,
-        minVectorStepKm: clampNumber(document.getElementById("minVectorStepKm").value, 0, 1000, 150),
+        virtualPullFactor: clampNumber(document.getElementById("virtualPullPercent").value, 1, 200, 100) / 100,
         localRefineTriggerMs: clampNumber(document.getElementById("localRefineTriggerMs").value, 0, 100, 20),
         localRefineRadiusKm: clampNumber(document.getElementById("localRefineRadiusKm").value, 25, 1000, 200),
         maxRounds: clampNumber(document.getElementById("maxRounds").value, 1, 20, 10),
@@ -2795,7 +2705,7 @@
           elapsed: formatElapsedMs(performance.now() - runStartedAt),
           strategy: {
             name: "random-country-best-quarter-vector",
-            description: `Global seed pick, ${config.edgeProbeCount} random country probes, virtual center from all N probes, virtual center from the best ${config.bestVectorPercent}% using ${latencyWeightDescription(config.timingWeightPower)}, one search center translated ${Math.round(config.virtualPullFactor * 100)}% along that vector each round with at least ${config.minVectorStepKm} km movement, N nearest unmeasured probes around that center with radius expansion up to ${config.maxExpandedSearchRadiusKm} km, stop after ${config.minConvergeRounds} rounds when vector is within ${config.vectorConvergedKm} km, fast local refine at ${config.localRefineTriggerMs}ms or better, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest merged with confirmation results.`,
+            description: `Global seed pick, ${config.edgeProbeCount} random country probes, virtual center from all N probes, virtual center from the best ${config.bestVectorPercent}% using ${latencyWeightDescription(config.timingWeightPower)}, coordinates translated ${Math.round(config.virtualPullFactor * 100)}% along that vector each round, one nearest unmeasured probe per translated coordinate, fast local refine at ${config.localRefineTriggerMs}ms or better, final confirmation, and ${FINAL_RETEST_RADIUS_KM} km final-location retest merged with confirmation results.`,
             note: "This intentionally avoids measuring every probe in the continent."
           },
           narrowing: {
