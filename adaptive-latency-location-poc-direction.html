@@ -11,6 +11,14 @@
     .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
     label { display: inline-flex; gap: 6px; align-items: center; }
     input { padding: 6px 8px; width: 70px; }
+    #mapWrap { background: #f7f9fc; border: 1px solid #ccd6e0; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    #mapTitle { font-weight: 700; margin-bottom: 8px; }
+    #mapHint { color: #555; font-size: 13px; margin-top: 8px; }
+    #map { width: 100%; min-height: 360px; }
+    #map svg { width: 100%; height: auto; display: block; background: linear-gradient(#fdfefe, #eef4fb); border-radius: 6px; }
+    .map-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; margin-top: 8px; color: #333; }
+    .legend-item { display: inline-flex; gap: 5px; align-items: center; }
+    .legend-swatch { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
     pre { background: #111; color: #eee; padding: 16px; border-radius: 8px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
     .hint { color: #555; font-size: 14px; margin-bottom: 12px; }
   </style>
@@ -42,10 +50,24 @@
     <label>Confirm top <input id="confirmTopCount" type="number" min="1" max="10" value="4" /></label>
   </div>
 
+  <div id="mapWrap">
+    <div id="mapTitle">Progress map</div>
+    <div id="map">Run the POC to render measured probes, virtual coordinates, vector steps, and final estimate.</div>
+    <div class="map-legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#9aa6b2"></span>Measured probe</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#2563eb"></span>All-N virtual center</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#f97316"></span>Best-% virtual center</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#7c3aed"></span>Search center</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#16a34a"></span>Final estimate</span>
+    </div>
+    <div id="mapHint">Place static equirectangular-style images in <code>maps/europe.png</code>, <code>maps/north-america.png</code>, etc. Dots and vectors are drawn on top using fixed coordinate bounds.</div>
+  </div>
+
   <pre id="out">Ready.</pre>
 
   <script>
     const out = document.getElementById("out");
+    const mapEl = document.getElementById("map");
     const runButton = document.getElementById("run");
     const stopButton = document.getElementById("stop");
 
@@ -56,6 +78,22 @@
     const STOP_AFTER_ROUNDS_WITHOUT_IMPROVEMENT = 10;
     const FINAL_RETEST_RADIUS_KM = 150;
     const STOPPED_ERROR_MESSAGE = "Run stopped by user.";
+    const STATIC_CONTINENT_BOUNDS = {
+      "Europe": { minLat: 35.00, maxLat: 71.3, minLon: -10.3, maxLon: 41.0 },
+      "North America": { minLat: 5, maxLat: 72, minLon: -170, maxLon: -50 },
+      "Asia": { minLat: -10, maxLat: 80, minLon: 25, maxLon: 180 },
+      "Africa": { minLat: -36, maxLat: 38, minLon: -20, maxLon: 55 },
+      "South America": { minLat: -56, maxLat: 15, minLon: -85, maxLon: -30 },
+      "Oceania": { minLat: -50, maxLat: 5, minLon: 105, maxLon: 180 }
+    };
+    const STATIC_CONTINENT_MAP_IMAGES = {
+      "Europe": "maps/europe.png",
+      "North America": "maps/north-america.png",
+      "Asia": "maps/asia.png",
+      "Africa": "maps/africa.png",
+      "South America": "maps/south-america.png",
+      "Oceania": "maps/oceania.png"
+    };
 
     /*
       Add/replace probes here. Keep id unique. Multiple probes per city/country are supported.
@@ -2716,6 +2754,8 @@
         selectedContinent: continent,
         selectedProbe: compactResult(finalSelectedProbe),
         adaptiveRounds: rounds,
+        initialVectorModel: vectorModel,
+        initialVirtualLocation: vectorModel?.bestVectorVirtual || null,
         randomCountryProbeCount: randomCountryProbes.length,
         randomCountryProbes: randomCountryProbes.map(compactResult),
         lastVectorModel: vectorModel,
@@ -2766,6 +2806,189 @@
       if (ratio > 2.0 && jitter < 30) return "high";
       if (ratio > 1.4 && jitter < 80) return "medium";
       return "low";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderProgressMap(payload) {
+      if (!payload?.estimate?.ok) {
+        mapEl.textContent = "No successful estimate to render.";
+        return;
+      }
+
+      const rounds = payload.narrowing?.adaptiveRounds || [];
+      const measured = (payload.allMeasuredResults || []).filter(hasLatLon);
+      const vectorModels = [
+        payload.narrowing?.initialVectorModel,
+        ...rounds.map(round => round.vectorModel)
+      ].filter(Boolean);
+      const allVirtualPoints = vectorModels.map((model, index) => ({
+        ...model.allVirtual,
+        label: `${index === 0 ? "seed" : `round ${index}`} all-N virtual`
+      })).filter(hasLatLon);
+      const bestVirtualPoints = [
+        payload.narrowing?.initialVirtualLocation
+          ? { ...payload.narrowing.initialVirtualLocation, label: "seed best-% virtual" }
+          : null,
+        ...rounds.map(round => round.virtualLocation ? { ...round.virtualLocation, label: `round ${round.round} best-% virtual` } : null)
+      ].filter(hasLatLon);
+      const searchCenters = rounds.map(round => round.searchCenter ? {
+        ...round.searchCenter,
+        label: `round ${round.round} search center`
+      } : null).filter(hasLatLon);
+      const finalPoint = {
+        lat: payload.estimate.approximateLat,
+        lon: payload.estimate.approximateLon,
+        label: `final ${payload.estimate.nearestRegion}, ${payload.estimate.nearestCountry}`
+      };
+
+      const pointsForBounds = [
+        ...measured,
+        ...allVirtualPoints,
+        ...bestVirtualPoints,
+        ...searchCenters,
+        finalPoint
+      ].filter(hasLatLon);
+
+      if (!pointsForBounds.length) {
+        mapEl.textContent = "No coordinates to render.";
+        return;
+      }
+
+      const mapData = {
+        measured,
+        vectorModels,
+        allVirtualPoints,
+        bestVirtualPoints,
+        searchCenters,
+        finalPoint,
+        pointsForBounds
+      };
+
+      renderSvgProgressMap(mapData, payload.narrowing?.selectedContinent);
+    }
+
+    function renderSvgProgressMap(mapData, selectedContinent) {
+      mapEl.className = "";
+      const { measured, vectorModels, allVirtualPoints, bestVirtualPoints, searchCenters, finalPoint, pointsForBounds } = mapData;
+      const width = 960;
+      const height = 963;
+      const margin = 46;
+      const minLatRaw = Math.min(...pointsForBounds.map(point => point.lat));
+      const maxLatRaw = Math.max(...pointsForBounds.map(point => point.lat));
+      const minLonRaw = Math.min(...pointsForBounds.map(point => point.lon));
+      const maxLonRaw = Math.max(...pointsForBounds.map(point => point.lon));
+      const continentBounds = STATIC_CONTINENT_BOUNDS[selectedContinent];
+      const latPad = Math.max(0.25, (maxLatRaw - minLatRaw) * 0.12);
+      const lonPad = Math.max(0.25, (maxLonRaw - minLonRaw) * 0.12);
+      const minLat = continentBounds ? continentBounds.minLat : minLatRaw - latPad;
+      const maxLat = continentBounds ? continentBounds.maxLat : maxLatRaw + latPad;
+      const minLon = continentBounds ? continentBounds.minLon : minLonRaw - lonPad;
+      const maxLon = continentBounds ? continentBounds.maxLon : maxLonRaw + lonPad;
+
+      function project(point) {
+        const x = margin + ((point.lon - minLon) / Math.max(0.0001, maxLon - minLon)) * (width - margin * 2);
+        const y = margin + ((maxLat - point.lat) / Math.max(0.0001, maxLat - minLat)) * (height - margin * 2);
+        return { x, y };
+      }
+
+      function circle(point, radius, fill, stroke, extraTitle = "") {
+        const { x, y } = project(point);
+        const title = `${point.label || point.id || "point"} ${Number(point.lat).toFixed(4)}, ${Number(point.lon).toFixed(4)}${extraTitle}`;
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"><title>${escapeHtml(title)}</title></circle>`;
+      }
+
+      function text(point, textValue, dy = -8, fill = "#111827") {
+        const { x, y } = project(point);
+        return `<text x="${x.toFixed(1)}" y="${(y + dy).toFixed(1)}" fill="${fill}" font-size="11" text-anchor="middle">${escapeHtml(textValue)}</text>`;
+      }
+
+      function line(a, b, color, dash = "", arrow = true) {
+        if (!hasLatLon(a) || !hasLatLon(b)) return "";
+        const pa = project(a);
+        const pb = project(b);
+        return `<line x1="${pa.x.toFixed(1)}" y1="${pa.y.toFixed(1)}" x2="${pb.x.toFixed(1)}" y2="${pb.y.toFixed(1)}" stroke="${color}" stroke-width="2" ${dash ? `stroke-dasharray="${dash}"` : ""} ${arrow ? `marker-end="url(#arrow)"` : ""} />`;
+      }
+
+      function staticMapImage() {
+        const href = STATIC_CONTINENT_MAP_IMAGES[selectedContinent];
+        if (!href) return "";
+
+        return `
+          <image
+            href="${escapeHtml(href)}"
+            x="${margin}"
+            y="${margin}"
+            width="${width - margin * 2}"
+            height="${height - margin * 2}"
+            preserveAspectRatio="none"
+            opacity="0.92"
+          >
+            <title>Static map background: ${escapeHtml(href)}</title>
+          </image>
+        `;
+      }
+
+      function graticule() {
+        const lines = [];
+        const latStep = selectedContinent === "Europe" ? 5 : 10;
+        const lonStep = selectedContinent === "Europe" ? 10 : 20;
+        for (let lat = Math.ceil(minLat / latStep) * latStep; lat <= maxLat; lat += latStep) {
+          lines.push(line({ lat, lon: minLon }, { lat, lon: maxLon }, "#d7e0ea", "2 6", false));
+          const p = project({ lat, lon: minLon });
+          lines.push(`<text x="${(p.x + 4).toFixed(1)}" y="${(p.y - 3).toFixed(1)}" fill="#94a3b8" font-size="10">${lat}°</text>`);
+        }
+        for (let lon = Math.ceil(minLon / lonStep) * lonStep; lon <= maxLon; lon += lonStep) {
+          lines.push(line({ lat: minLat, lon }, { lat: maxLat, lon }, "#d7e0ea", "2 6", false));
+          const p = project({ lat: minLat, lon });
+          lines.push(`<text x="${(p.x + 3).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" fill="#94a3b8" font-size="10">${lon}°</text>`);
+        }
+        return lines.join("");
+      }
+
+      const measuredSvg = measured
+        .slice(0, 600)
+        .map(point => {
+          const score = Number.isFinite(point.scoreMs) ? `${point.scoreMs}ms` : "n/a";
+          return circle(point, 3, "#9aa6b2", "#64748b", `, ${point.region || ""}, ${point.country || ""}, ${score}`);
+        })
+        .join("");
+      const vectorSvg = vectorModels.map(model => line(model.allVirtual, model.bestVectorVirtual, "#f97316")).join("");
+      const allVirtualSvg = allVirtualPoints.map((point, index) => circle(point, 5, "#2563eb", "#1d4ed8") + text(point, index === 0 ? "A0" : `A${index}`)).join("");
+      const bestVirtualSvg = bestVirtualPoints.map((point, index) => circle(point, 6, "#f97316", "#c2410c") + text(point, index === 0 ? "B0" : `B${index}`, 16, "#9a3412")).join("");
+      const searchCenterSvg = searchCenters.map(point => circle(point, 5, "#7c3aed", "#5b21b6") + text(point, `S${point.round}`, -10, "#5b21b6")).join("");
+      const pathSvg = bestVirtualPoints.slice(1).map((point, index) => line(bestVirtualPoints[index], point, "#f97316", "5 4")).join("");
+      const finalSvg = circle(finalPoint, 8, "#16a34a", "#166534") + text(finalPoint, "final", -12, "#166534");
+      const mapImagePath = STATIC_CONTINENT_MAP_IMAGES[selectedContinent];
+      const boundsLabel = `${selectedContinent || "Measured area"} static bounds: ${minLat.toFixed(1)}..${maxLat.toFixed(1)} lat, ${minLon.toFixed(1)}..${maxLon.toFixed(1)} lon${mapImagePath ? `, image: ${mapImagePath}` : ""}`;
+
+      mapEl.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Latency location progress map">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#f97316"></path>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="${width}" height="${height}" fill="#eaf6fb"></rect>
+          <rect x="${margin}" y="${margin}" width="${width - margin * 2}" height="${height - margin * 2}" fill="#cfe8f3" stroke="#cbd5e1"></rect>
+          ${staticMapImage()}
+          ${graticule()}
+          <text x="${margin}" y="24" fill="#475569" font-size="12">Bounds: ${escapeHtml(boundsLabel)}</text>
+          ${measuredSvg}
+          ${pathSvg}
+          ${vectorSvg}
+          ${allVirtualSvg}
+          ${bestVirtualSvg}
+          ${searchCenterSvg}
+          ${finalSvg}
+        </svg>
+      `;
     }
 
     function clampNumber(value, min, max, fallback) {
@@ -2861,6 +3084,8 @@
             finalRetestRadiusKm: adaptive.finalRetestRadiusKm,
             finalRetestCenter: adaptive.finalRetestCenter,
             finalRetestProbeCount: adaptive.finalRetestProbeCount,
+            initialVectorModel: adaptive.initialVectorModel,
+            initialVirtualLocation: adaptive.initialVirtualLocation,
             adaptiveRounds: adaptive.adaptiveRounds
           },
           selectedProbe: adaptive.selectedProbe,
@@ -2875,6 +3100,7 @@
         out.textContent =
           `Finished in ${formatElapsedMs(performance.now() - runStartedAt)}.\n\nProgress log:\n${progressLog.join("\n")}\n\nResult:\n` +
           JSON.stringify(payload, null, 2);
+        renderProgressMap(payload);
         console.log(payload);
       } catch (error) {
         if (isStoppedError(error)) {
