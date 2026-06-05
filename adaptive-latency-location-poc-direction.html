@@ -2544,6 +2544,31 @@
       const continentProbes = getContinentProbes(continent);
       const measuredMap = new Map();
       const rounds = [];
+      const liveMapState = {
+        narrowing: {
+          selectedContinent: continent,
+          adaptiveRounds: []
+        },
+        allMeasuredResults: []
+      };
+
+      function updateLiveMap(extra = {}) {
+        liveMapState.narrowing.adaptiveRounds = rounds;
+        liveMapState.allMeasuredResults = [...measuredMap.values()]
+          .filter(r => r.ok)
+          .sort((a, b) => a.scoreMs - b.scoreMs)
+          .map(compactResult);
+        renderProgressMap({
+          ...liveMapState,
+          ...extra,
+          narrowing: {
+            ...liveMapState.narrowing,
+            ...(extra.narrowing || {})
+          }
+        });
+      }
+
+      updateLiveMap();
 
       const randomCountryProbeCount = Math.min(config.edgeProbeCount, continentProbes.filter(hasLatLon).length);
       const randomCountryProbes = pickRandomCountryProbes(continentProbes, randomCountryProbeCount);
@@ -2562,6 +2587,9 @@
       let best = getBestResult(randomSeedResults);
       let vectorModel = vectorModelFromWaveResults(randomSeedResults, randomCountryProbeCount, config.bestVectorPercent, config.timingWeightPower);
       let virtualLocation = vectorModel?.bestVectorVirtual || targetLocationFromResults(randomSeedResults, randomCountryProbeCount, config.timingWeightPower);
+      liveMapState.narrowing.initialVectorModel = vectorModel;
+      liveMapState.narrowing.initialVirtualLocation = vectorModel?.bestVectorVirtual || null;
+      updateLiveMap();
       if (progress) progress({ separator: `Vector after random country seed wave: ${formatVectorModel(vectorModel)}` });
       logVirtualLocation(`random country seed wave best ${config.bestVectorPercent}%`, virtualLocation, progress);
       let roundsWithoutImprovement = 0;
@@ -2716,6 +2744,8 @@
           searchPoints
         });
 
+        updateLiveMap();
+
         if (stopAfterLocalRefine) break;
         if (roundsWithoutImprovement >= STOP_AFTER_ROUNDS_WITHOUT_IMPROVEMENT) break;
 
@@ -2749,6 +2779,8 @@
       const successfulRadiusRetestResults = radiusRetestResults.filter(r => r.ok).sort((a, b) => a.scoreMs - b.scoreMs);
       const finalResults = mergeBestResultsById([...confirmedResults, ...successfulRadiusRetestResults]);
       const finalSelectedProbe = getBestResult(finalResults) || provisionalFinalProbe;
+      const liveEstimate = weightedEstimateFromTop(finalResults.filter(r => r.ok), 3);
+      updateLiveMap({ estimate: liveEstimate });
 
       return {
         selectedContinent: continent,
@@ -2817,11 +2849,7 @@
     }
 
     function renderProgressMap(payload) {
-      if (!payload?.estimate?.ok) {
-        mapEl.textContent = "No successful estimate to render.";
-        return;
-      }
-
+      const selectedContinent = payload.narrowing?.selectedContinent;
       const rounds = payload.narrowing?.adaptiveRounds || [];
       const measured = (payload.allMeasuredResults || []).filter(hasLatLon);
       const vectorModels = [
@@ -2842,11 +2870,11 @@
         ...round.searchCenter,
         label: `round ${round.round} search center`
       } : null).filter(hasLatLon);
-      const finalPoint = {
+      const finalPoint = payload.estimate?.ok ? {
         lat: payload.estimate.approximateLat,
         lon: payload.estimate.approximateLon,
         label: `final ${payload.estimate.nearestRegion}, ${payload.estimate.nearestCountry}`
-      };
+      } : null;
 
       const pointsForBounds = [
         ...measured,
@@ -2856,8 +2884,8 @@
         finalPoint
       ].filter(hasLatLon);
 
-      if (!pointsForBounds.length) {
-        mapEl.textContent = "No coordinates to render.";
+      if (!selectedContinent && !pointsForBounds.length) {
+        mapEl.textContent = "No coordinates to render yet.";
         return;
       }
 
@@ -2871,7 +2899,7 @@
         pointsForBounds
       };
 
-      renderSvgProgressMap(mapData, payload.narrowing?.selectedContinent);
+      renderSvgProgressMap(mapData, selectedContinent);
     }
 
     function renderSvgProgressMap(mapData, selectedContinent) {
@@ -2880,11 +2908,11 @@
       const width = 960;
       const height = 963;
       const margin = 46;
-      const minLatRaw = Math.min(...pointsForBounds.map(point => point.lat));
-      const maxLatRaw = Math.max(...pointsForBounds.map(point => point.lat));
-      const minLonRaw = Math.min(...pointsForBounds.map(point => point.lon));
-      const maxLonRaw = Math.max(...pointsForBounds.map(point => point.lon));
       const continentBounds = STATIC_CONTINENT_BOUNDS[selectedContinent];
+      const minLatRaw = pointsForBounds.length ? Math.min(...pointsForBounds.map(point => point.lat)) : continentBounds?.minLat ?? -60;
+      const maxLatRaw = pointsForBounds.length ? Math.max(...pointsForBounds.map(point => point.lat)) : continentBounds?.maxLat ?? 80;
+      const minLonRaw = pointsForBounds.length ? Math.min(...pointsForBounds.map(point => point.lon)) : continentBounds?.minLon ?? -180;
+      const maxLonRaw = pointsForBounds.length ? Math.max(...pointsForBounds.map(point => point.lon)) : continentBounds?.maxLon ?? 180;
       const latPad = Math.max(0.25, (maxLatRaw - minLatRaw) * 0.12);
       const lonPad = Math.max(0.25, (maxLonRaw - minLonRaw) * 0.12);
       const minLat = continentBounds ? continentBounds.minLat : minLatRaw - latPad;
@@ -2964,7 +2992,7 @@
       const bestVirtualSvg = bestVirtualPoints.map((point, index) => circle(point, 6, "#f97316", "#c2410c") + text(point, index === 0 ? "B0" : `B${index}`, 16, "#9a3412")).join("");
       const searchCenterSvg = searchCenters.map(point => circle(point, 5, "#7c3aed", "#5b21b6") + text(point, `S${point.round}`, -10, "#5b21b6")).join("");
       const pathSvg = bestVirtualPoints.slice(1).map((point, index) => line(bestVirtualPoints[index], point, "#f97316", "5 4")).join("");
-      const finalSvg = circle(finalPoint, 8, "#16a34a", "#166534") + text(finalPoint, "final", -12, "#166534");
+      const finalSvg = hasLatLon(finalPoint) ? circle(finalPoint, 8, "#16a34a", "#166534") + text(finalPoint, "final", -12, "#166534") : "";
       const mapImagePath = STATIC_CONTINENT_MAP_IMAGES[selectedContinent];
       const boundsLabel = `${selectedContinent || "Measured area"} static bounds: ${minLat.toFixed(1)}..${maxLat.toFixed(1)} lat, ${minLon.toFixed(1)}..${maxLon.toFixed(1)} lon${mapImagePath ? `, image: ${mapImagePath}` : ""}`;
 
