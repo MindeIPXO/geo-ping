@@ -2988,9 +2988,9 @@
         })
         .join("");
       const vectorSvg = vectorModels.map(model => line(model.allVirtual, model.bestVectorVirtual, "#f97316")).join("");
-      const allVirtualSvg = allVirtualPoints.map((point, index) => circle(point, 5, "#2563eb", "#1d4ed8") + text(point, index === 0 ? "A0" : `A${index}`)).join("");
-      const bestVirtualSvg = bestVirtualPoints.map((point, index) => circle(point, 6, "#f97316", "#c2410c") + text(point, index === 0 ? "B0" : `B${index}`, 16, "#9a3412")).join("");
-      const searchCenterSvg = searchCenters.map(point => circle(point, 5, "#7c3aed", "#5b21b6") + text(point, `S${point.round}`, -10, "#5b21b6")).join("");
+      const allVirtualSvg = allVirtualPoints.map((point, index) => circle(point, 3, "#2563eb", "#1d4ed8") + text(point, index === 0 ? "A0" : `A${index}`)).join("");
+      const bestVirtualSvg = bestVirtualPoints.map((point, index) => circle(point, 3, "#f97316", "#c2410c") + text(point, index === 0 ? "B0" : `B${index}`, 16, "#9a3412")).join("");
+      const searchCenterSvg = searchCenters.map(point => circle(point, 3, "#7c3aed", "#5b21b6") + text(point, `S${point.round}`, -10, "#5b21b6")).join("");
       const pathSvg = bestVirtualPoints.slice(1).map((point, index) => line(bestVirtualPoints[index], point, "#f97316", "5 4")).join("");
       const finalSvg = hasLatLon(finalPoint) ? circle(finalPoint, 8, "#16a34a", "#166534") + text(finalPoint, "final", -12, "#166534") : "";
       const mapImagePath = STATIC_CONTINENT_MAP_IMAGES[selectedContinent];
