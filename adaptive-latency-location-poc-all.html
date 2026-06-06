@@ -11,6 +11,14 @@
     .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
     label { display: inline-flex; gap: 6px; align-items: center; }
     input { padding: 6px 8px; width: 70px; }
+    #mapWrap { background: #f7f9fc; border: 1px solid #ccd6e0; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    #mapTitle { font-weight: 700; margin-bottom: 8px; }
+    #mapHint { color: #555; font-size: 13px; margin-top: 8px; }
+    #map { width: 100%; min-height: 360px; }
+    #map svg { width: 100%; height: auto; display: block; background: linear-gradient(#fdfefe, #eef4fb); border-radius: 6px; }
+    .map-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; margin-top: 8px; color: #333; }
+    .legend-item { display: inline-flex; gap: 5px; align-items: center; }
+    .legend-swatch { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
     pre { background: #111; color: #eee; padding: 16px; border-radius: 8px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
     .hint { color: #555; font-size: 14px; margin-bottom: 12px; }
   </style>
@@ -34,10 +42,21 @@
     <label>Confirm top <input id="confirmTopCount" type="number" min="1" max="10" value="4" /></label>
   </div>
 
+  <div id="mapWrap">
+    <div id="mapTitle">Progress map</div>
+    <div id="map">Run the POC to render measured probes and final estimate.</div>
+    <div class="map-legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#9aa6b2"></span>Measured probe</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#16a34a"></span>Final estimate</span>
+    </div>
+    <div id="mapHint">Place static equirectangular-style images in <code>maps/europe.png</code>, <code>maps/north-america.png</code>, etc. Dots are drawn on top using fixed coordinate bounds.</div>
+  </div>
+
   <pre id="out">Ready.</pre>
 
   <script>
     const out = document.getElementById("out");
+    const mapEl = document.getElementById("map");
     const runButton = document.getElementById("run");
     const stopButton = document.getElementById("stop");
 
@@ -2351,6 +2370,166 @@
       return `${minutes}:${String(seconds).padStart(2, "0")}`;
     }
 
+    const STATIC_CONTINENT_BOUNDS = {
+      "Europe": { minLat: 35.50, maxLat: 71.37, minLon: -11.2, maxLon: 40.6 },
+      "North America": { minLat: 5, maxLat: 72, minLon: -170, maxLon: -50 },
+      "Asia": { minLat: -10, maxLat: 80, minLon: 25, maxLon: 180 },
+      "Africa": { minLat: -36, maxLat: 38, minLon: -20, maxLon: 55 },
+      "South America": { minLat: -56, maxLat: 15, minLon: -85, maxLon: -30 },
+      "Oceania": { minLat: -50, maxLat: 5, minLon: 105, maxLon: 180 }
+    };
+    const STATIC_CONTINENT_MAP_IMAGES = {
+      "Europe": "maps/europe.png",
+      "North America": "maps/north-america.png",
+      "Asia": "maps/asia.png",
+      "Africa": "maps/africa.png",
+      "South America": "maps/south-america.png",
+      "Oceania": "maps/oceania.png"
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderProgressMap(payload) {
+      const selectedContinent = payload.narrowing?.selectedContinent;
+      const measured = (payload.allMeasuredResults || []).filter(hasLatLon);
+      const finalPoint = payload.estimate?.ok ? {
+        lat: payload.estimate.approximateLat,
+        lon: payload.estimate.approximateLon,
+        label: `final ${payload.estimate.nearestRegion}, ${payload.estimate.nearestCountry}`
+      } : null;
+
+      const pointsForBounds = [
+        ...measured,
+        finalPoint
+      ].filter(hasLatLon);
+
+      if (!selectedContinent && !pointsForBounds.length) {
+        mapEl.textContent = "No coordinates to render yet.";
+        return;
+      }
+
+      const mapData = {
+        measured,
+        finalPoint,
+        pointsForBounds
+      };
+
+      renderSvgProgressMap(mapData, selectedContinent);
+    }
+
+    function renderSvgProgressMap(mapData, selectedContinent) {
+      mapEl.className = "";
+      const { measured, finalPoint, pointsForBounds } = mapData;
+      const width = 960;
+      const height = 963;
+      const margin = 46;
+      const continentBounds = STATIC_CONTINENT_BOUNDS[selectedContinent];
+      const minLatRaw = pointsForBounds.length ? Math.min(...pointsForBounds.map(point => point.lat)) : continentBounds?.minLat ?? -60;
+      const maxLatRaw = pointsForBounds.length ? Math.max(...pointsForBounds.map(point => point.lat)) : continentBounds?.maxLat ?? 80;
+      const minLonRaw = pointsForBounds.length ? Math.min(...pointsForBounds.map(point => point.lon)) : continentBounds?.minLon ?? -180;
+      const maxLonRaw = pointsForBounds.length ? Math.max(...pointsForBounds.map(point => point.lon)) : continentBounds?.maxLon ?? 180;
+      const latPad = Math.max(0.25, (maxLatRaw - minLatRaw) * 0.12);
+      const lonPad = Math.max(0.25, (maxLonRaw - minLonRaw) * 0.12);
+      const minLat = continentBounds ? continentBounds.minLat : minLatRaw - latPad;
+      const maxLat = continentBounds ? continentBounds.maxLat : maxLatRaw + latPad;
+      const minLon = continentBounds ? continentBounds.minLon : minLonRaw - lonPad;
+      const maxLon = continentBounds ? continentBounds.maxLon : maxLonRaw + lonPad;
+
+      function project(point) {
+        const x = margin + ((point.lon - minLon) / Math.max(0.0001, maxLon - minLon)) * (width - margin * 2);
+        const y = margin + ((maxLat - point.lat) / Math.max(0.0001, maxLat - minLat)) * (height - margin * 2);
+        return { x, y };
+      }
+
+      function circle(point, radius, fill, stroke, extraTitle = "") {
+        const { x, y } = project(point);
+        const title = `${point.label || point.id || "point"} ${Number(point.lat).toFixed(4)}, ${Number(point.lon).toFixed(4)}${extraTitle}`;
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"><title>${escapeHtml(title)}</title></circle>`;
+      }
+
+      function text(point, textValue, dy = -8, fill = "#111827") {
+        const { x, y } = project(point);
+        return `<text x="${x.toFixed(1)}" y="${(y + dy).toFixed(1)}" fill="${fill}" font-size="11" text-anchor="middle">${escapeHtml(textValue)}</text>`;
+      }
+
+      function line(a, b, color, dash = "", arrow = true) {
+        if (!hasLatLon(a) || !hasLatLon(b)) return "";
+        const pa = project(a);
+        const pb = project(b);
+        return `<line x1="${pa.x.toFixed(1)}" y1="${pa.y.toFixed(1)}" x2="${pb.x.toFixed(1)}" y2="${pb.y.toFixed(1)}" stroke="${color}" stroke-width="2" ${dash ? `stroke-dasharray="${dash}"` : ""} ${arrow ? `marker-end="url(#arrow)"` : ""} />`;
+      }
+
+      function staticMapImage() {
+        const href = STATIC_CONTINENT_MAP_IMAGES[selectedContinent];
+        if (!href) return "";
+
+        return `
+          <image
+            href="${escapeHtml(href)}"
+            x="${margin}"
+            y="${margin}"
+            width="${width - margin * 2}"
+            height="${height - margin * 2}"
+            preserveAspectRatio="none"
+            opacity="0.92"
+          >
+            <title>Static map background: ${escapeHtml(href)}</title>
+          </image>
+        `;
+      }
+
+      function graticule() {
+        const lines = [];
+        const latStep = selectedContinent === "Europe" ? 5 : 10;
+        const lonStep = selectedContinent === "Europe" ? 10 : 20;
+        for (let lat = Math.ceil(minLat / latStep) * latStep; lat <= maxLat; lat += latStep) {
+          lines.push(line({ lat, lon: minLon }, { lat, lon: maxLon }, "#d7e0ea", "2 6", false));
+          const p = project({ lat, lon: minLon });
+          lines.push(`<text x="${(p.x + 4).toFixed(1)}" y="${(p.y - 3).toFixed(1)}" fill="#94a3b8" font-size="10">${lat}°</text>`);
+        }
+        for (let lon = Math.ceil(minLon / lonStep) * lonStep; lon <= maxLon; lon += lonStep) {
+          lines.push(line({ lat: minLat, lon }, { lat: maxLat, lon }, "#d7e0ea", "2 6", false));
+          const p = project({ lat: minLat, lon });
+          lines.push(`<text x="${(p.x + 3).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" fill="#94a3b8" font-size="10">${lon}°</text>`);
+        }
+        return lines.join("");
+      }
+
+      const measuredSvg = measured
+        .slice(0, 600)
+        .map(point => {
+          const score = Number.isFinite(point.scoreMs) ? `${point.scoreMs}ms` : "n/a";
+          return circle(point, 3, "#9aa6b2", "#64748b", `, ${point.region || ""}, ${point.country || ""}, ${score}`);
+        })
+        .join("");
+      const finalSvg = hasLatLon(finalPoint) ? circle(finalPoint, 8, "#16a34a", "#166534") + text(finalPoint, "final", -12, "#166534") : "";
+      const mapImagePath = STATIC_CONTINENT_MAP_IMAGES[selectedContinent];
+      const boundsLabel = `${selectedContinent || "Measured area"} static bounds: ${minLat.toFixed(1)}..${maxLat.toFixed(1)} lat, ${minLon.toFixed(1)}..${maxLon.toFixed(1)} lon${mapImagePath ? `, image: ${mapImagePath}` : ""}`;
+
+      mapEl.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Latency location progress map">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#f97316"></path>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="${width}" height="${height}" fill="#eaf6fb"></rect>
+          <rect x="${margin}" y="${margin}" width="${width - margin * 2}" height="${height - margin * 2}" fill="#cfe8f3" stroke="#cbd5e1"></rect>
+          ${staticMapImage()}
+          ${graticule()}
+          <text x="${margin}" y="24" fill="#475569" font-size="12">Bounds: ${escapeHtml(boundsLabel)}</text>
+          ${measuredSvg}
+          ${finalSvg}
+        </svg>
+      `;
+    }
+
     async function run() {
       const runControl = createRunControl();
       activeRunControl = runControl;
@@ -2360,6 +2539,9 @@
       const runStartedAt = performance.now();
       const config = getConfigFromInputs();
       const progressLog = [];
+      let currentPayload = null;
+      const measuredResults = new Map();
+      
       const progress = ({ finished, total, result, separator }) => {
         const elapsed = formatElapsedMs(performance.now() - runStartedAt);
         if (separator) {
@@ -2370,17 +2552,37 @@
               result?.ok ? `${result.scoreMs}ms` : "failed"
             }`
           );
+          // Track measured results
+          if (result) {
+            measuredResults.set(result.id, result);
+          }
         }
 
         if (progressLog.length > 3500) progressLog.shift();
 
         out.textContent = `Running...\n\nLatest measurements:\n${progressLog.join("\n")}`;
+        
+        // Update map with latest measurements
+        if (currentPayload) {
+          currentPayload.allMeasuredResults = Array.from(measuredResults.values()).filter(r => r.ok).sort((a, b) => a.scoreMs - b.scoreMs);
+          renderProgressMap(currentPayload);
+        }
       };
 
       try {
         progressMessage("Picking continent from global seeds...");
         const continentPick = await pickContinent(config, progress, runControl);
         if (!continentPick.selectedContinent) throw new Error("Could not select a continent. No global seed probes succeeded.");
+
+        // Show map after continent is selected
+        currentPayload = {
+          estimate: { ok: false },
+          narrowing: { selectedContinent: continentPick.selectedContinent },
+          allMeasuredResults: [],
+          config,
+          elapsedMs: Math.round(performance.now() - runStartedAt)
+        };
+        renderProgressMap(currentPayload);
 
         const adaptive = await adaptiveSearchContinent(continentPick.selectedContinent, config, progress, runControl);
         const estimate = weightedEstimateFromTop(adaptive.finalResults.filter(r => r.ok), 3);
@@ -2414,6 +2616,9 @@
           countryRanking: adaptive.countryRanking,
           allMeasuredResults: adaptive.allMeasuredResults
         };
+
+        currentPayload = payload;
+        renderProgressMap(payload);
 
         out.textContent =
           `Finished in ${formatElapsedMs(performance.now() - runStartedAt)}.\n\nProgress log:\n${progressLog.join("\n")}\n\nResult:\n` +
